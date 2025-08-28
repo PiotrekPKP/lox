@@ -4,6 +4,7 @@ use std::fs;
 use std::io;
 use std::io::Write;
 use std::iter::Peekable;
+use std::ops::Deref;
 use std::process::exit;
 use std::rc::Rc;
 use std::str::Chars;
@@ -569,7 +570,7 @@ impl std::fmt::Display for Token {
 
 #[derive(Debug)]
 struct AssignExpr {
-    name: Token,
+    name: String,
     value: Box<Expr>,
 }
 
@@ -674,7 +675,14 @@ enum Expr {
 impl Expr {
     fn eval(&self) -> LoxType {
         match self {
-            Expr::Assign(assign_expr) => LoxType::Unknown,
+            Expr::Assign(assign_expr) => {
+                let value = assign_expr.value.eval();
+                let mut env = global_env().lock().unwrap();
+
+                env.assign(assign_expr.name.clone(), value.clone());
+
+                return value;
+            }
             Expr::Binary(binary_expr) => {
                 let left = binary_expr.left.eval();
                 let right = binary_expr.right.eval();
@@ -810,6 +818,7 @@ enum Statement {
     Expression(Expr),
     Print(Expr),
     Var(VarStatement),
+    Block(Vec<Statement>),
 }
 
 impl Statement {
@@ -832,11 +841,35 @@ impl Statement {
                 let mut env = global_env().lock().unwrap();
                 env.define(vs.name.clone(), value);
             }
+            Statement::Block(block) => {
+                let enclosed = {
+                    let mut guard = global_env().lock().unwrap();
+                    let mut enclosed = Environment {
+                        enclosing: Some(Box::new(guard.clone())),
+                        values: HashMap::new(),
+                    };
+
+                    std::mem::swap(&mut *guard, &mut enclosed);
+
+                    enclosed
+                };
+
+                block.iter().for_each(|s| s.eval());
+
+                {
+                    let mut guard = global_env().lock().unwrap();
+                    let mut tmp = enclosed;
+
+                    std::mem::swap(&mut *guard, &mut tmp);
+                }
+            }
         }
     }
 }
 
+#[derive(Debug, Clone)]
 struct Environment {
+    enclosing: Option<Box<Environment>>,
     values: HashMap<String, LoxType>,
 }
 
@@ -850,7 +883,25 @@ impl Environment {
             return value;
         }
 
+        if let Some(enclosing) = &self.enclosing {
+            return enclosing.get(name);
+        }
+
         parse_error!("Undefined variable '{}'.", name);
+    }
+
+    fn assign(&mut self, name: String, value: LoxType) {
+        if let Some(_) = self.values.get(&name) {
+            self.values.insert(name.clone(), value);
+            return;
+        }
+
+        if let Some(ref mut enclosing) = self.enclosing {
+            enclosing.assign(name.clone(), value);
+            return;
+        }
+
+        parse_error!("Undefined variable '{}'", name);
     }
 }
 
@@ -860,6 +911,7 @@ fn global_env() -> &'static Mutex<Environment> {
     GLOBAL_ENV.get_or_init(|| {
         Mutex::new(Environment {
             values: HashMap::new(),
+            enclosing: None,
         })
     })
 }
@@ -891,7 +943,37 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Expr {
-        return self.ternary();
+        return self.assignment();
+    }
+
+    fn assignment(&mut self) -> Expr {
+        let expr = self.ternary();
+
+        if let Some(token) = self.tokens.get(self.current).cloned() {
+            match token {
+                Token::Equal(_) => {
+                    self.current += 1;
+
+                    let value = self.assignment();
+
+                    match expr {
+                        Expr::Variable(v) => {
+                            return Expr::Assign(AssignExpr {
+                                name: v.name,
+                                value: Box::new(value),
+                            });
+                        }
+                        _ => parse_error!(
+                            "[line {}] Error: Invalid assignment target.",
+                            token.line()
+                        ),
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        return expr;
     }
 
     fn ternary(&mut self) -> Expr {
@@ -1206,11 +1288,39 @@ impl Parser {
                     }
                     _ => {}
                 },
+                Token::LeftBrace(_) => {
+                    self.current += 1;
+
+                    return Statement::Block(self.block());
+                }
                 _ => {}
             }
         }
 
         return self.expression_statement();
+    }
+
+    fn block(&mut self) -> Vec<Statement> {
+        let mut statements = vec![];
+
+        while let Some(token) = self.tokens.get(self.current) {
+            if let Token::RightBrace(_) = token {
+                break;
+            }
+
+            statements.push(self.declaration());
+        }
+
+        if let Some(token) = self.tokens.get(self.current) {
+            match token {
+                Token::RightBrace(_) => {
+                    self.current += 1;
+                }
+                _ => parse_error!("[line {}] Error: Missing '}}'.", token.line()),
+            }
+        }
+
+        return statements;
     }
 
     fn print_statement(&mut self) -> Statement {

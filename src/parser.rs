@@ -65,10 +65,6 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    fn previous(&self) -> Token {
-        return self.tokens[self.current - 1].clone();
-    }
-
     fn expression(&mut self) -> Expr {
         return self.assignment();
     }
@@ -99,8 +95,8 @@ impl Parser {
     fn or(&mut self) -> Expr {
         let mut expr = self.and();
 
-        while let Some(_) = match_token!(self, Keyword, Or) {
-            let operator = self.previous();
+        while let Some(op) = match_token!(self, Keyword, Or) {
+            let operator = op.clone();
             let right = self.and();
 
             expr = Expr::Logical(LogicalExpr {
@@ -116,8 +112,8 @@ impl Parser {
     fn and(&mut self) -> Expr {
         let mut expr = self.ternary();
 
-        while let Some(_) = match_token!(self, Keyword, And) {
-            let operator = self.previous();
+        while let Some(op) = match_token!(self, Keyword, And) {
+            let operator = op.clone();
             let right = self.ternary();
 
             expr = Expr::Logical(LogicalExpr {
@@ -151,8 +147,8 @@ impl Parser {
     fn equality(&mut self) -> Expr {
         let mut expr = self.comparison();
 
-        while let Some(_) = match_token!(self, BangEqual | EqualEqual) {
-            let operator = self.previous();
+        while let Some(op) = match_token!(self, BangEqual | EqualEqual) {
+            let operator = op.clone();
             let right = self.comparison();
 
             expr = Expr::Binary(BinaryExpr {
@@ -168,8 +164,8 @@ impl Parser {
     fn comparison(&mut self) -> Expr {
         let mut expr = self.term();
 
-        while let Some(_) = match_token!(self, Greater | GreaterEqual | Less | LessEqual) {
-            let operator = self.previous();
+        while let Some(op) = match_token!(self, Greater | GreaterEqual | Less | LessEqual) {
+            let operator = op.clone();
             let right = self.term();
 
             expr = Expr::Binary(BinaryExpr {
@@ -185,8 +181,8 @@ impl Parser {
     fn term(&mut self) -> Expr {
         let mut expr = self.factor();
 
-        while let Some(_) = match_token!(self, Minus | Plus) {
-            let operator = self.previous();
+        while let Some(op) = match_token!(self, Minus | Plus) {
+            let operator = op.clone();
             let right = self.factor();
 
             expr = Expr::Binary(BinaryExpr {
@@ -202,8 +198,8 @@ impl Parser {
     fn factor(&mut self) -> Expr {
         let mut expr = self.unary();
 
-        while let Some(_) = match_token!(self, Slash | Star) {
-            let operator = self.previous();
+        while let Some(op) = match_token!(self, Slash | Star) {
+            let operator = op.clone();
             let right = self.unary();
 
             expr = Expr::Binary(BinaryExpr {
@@ -217,8 +213,8 @@ impl Parser {
     }
 
     fn unary(&mut self) -> Expr {
-        if let Some(_) = match_token!(self, Bang | Minus) {
-            let operator = self.previous();
+        if let Some(op) = match_token!(self, Bang | Minus) {
+            let operator = op.clone();
             let right = self.unary();
 
             return Expr::Unary(UnaryExpr {

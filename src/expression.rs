@@ -1,7 +1,7 @@
 use crate::{
     environment::global_env,
-    lox_type::{LoxNumber, LoxString, LoxType},
     lox_error,
+    lox_type::{LoxNumber, LoxString, LoxType},
     token::{Keyword, Token},
 };
 

@@ -1,26 +1,8 @@
-var i = 0;
-var j = 0;
-var MAX = 6;
+var a = 0;
+var temp;
 
-while (i < MAX) {
-  i = i + 1;
-  j = 0;
-
-  if(i == 4) {
-    continue;
-  }
-
-  print "i = " + i;
-  
-  while (j < MAX) {
-    j = j + 1;
-    
-    if(j == i) {
-      continue;
-    }
-
-    print " j = " + j;
-  }
+for (var b = 1; a < 10000; b = temp + b) {
+  print a;
+  temp = a;
+  a = b;
 }
-
-print 1 ? "TERNARY WORKS!" : "fuck.";

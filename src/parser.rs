@@ -308,14 +308,11 @@ impl Parser {
 
                         self.current += 1;
 
-                        let initializer =
-                            if let Some(Token::Equal(_)) = self.tokens.get(self.current) {
-                                self.current += 1;
-
-                                Some(self.expression())
-                            } else {
-                                None
-                            };
+                        let initializer = if let Some(_) = match_token!(self, Equal) {
+                            Some(self.expression())
+                        } else {
+                            None
+                        };
 
                         consume!(self, Semicolon, "Error: Missing ';'.");
 
@@ -340,6 +337,10 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Statement {
+        if let Some(_) = match_token!(self, Keyword, For) {
+            return self.for_statement();
+        }
+
         if let Some(_) = match_token!(self, Keyword, Print) {
             return self.print_statement();
         }
@@ -380,6 +381,56 @@ impl Parser {
         consume!(self, RightBrace, "Error: Missing '}}'.");
 
         return statements;
+    }
+
+    fn for_statement(&mut self) -> Statement {
+        consume!(self, LeftParen, "Error: Expect '(' after 'for'.");
+
+        let mut initializer = None;
+        if let Some(_) = match_token!(self, Semicolon) {
+            initializer = None;
+        } else if let Some(_) = match_token!(self, Keyword, Var) {
+            initializer = Some(self.var_declaration());
+        } else {
+            initializer = Some(self.expression_statement());
+        }
+
+        let mut condition = None;
+        if let Some(token) = self.tokens.get(self.current) {
+            match token {
+                Token::Semicolon(_) => {}
+                _ => condition = Some(self.expression()),
+            }
+        }
+        consume!(self, Semicolon, "Error: Expect ';' after loop condition.");
+
+        let mut increment = None;
+        if let Some(token) = self.tokens.get(self.current) {
+            match token {
+                Token::RightParen(_) => {}
+                _ => increment = Some(self.expression()),
+            }
+        }
+        consume!(self, RightParen, "Error: Expect ')' after for clauses.");
+
+        let mut body = self.statement();
+
+        if let Some(incr) = increment {
+            body = Statement::Block(vec![body, Statement::Expression(incr)]);
+        }
+
+        body = Statement::While(WhileStatement {
+            condition: condition.unwrap_or(Expr::Literal(LiteralExpr {
+                value: LiteralExprType::Identifier(Keyword::True),
+            })),
+            body: Box::new(body),
+        });
+
+        if let Some(init) = initializer {
+            body = Statement::Block(vec![init, body]);
+        }
+
+        return body;
     }
 
     fn while_statement(&mut self) -> Statement {

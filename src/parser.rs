@@ -76,7 +76,8 @@ impl Parser {
     fn assignment(&mut self) -> Expr {
         let expr = self.or();
 
-        if let Some(token) = match_token!(self, Equal).cloned() {
+        if let Some(token) = match_token!(self, Equal) {
+            let line = token.line();
             let value = self.assignment();
 
             match expr {
@@ -87,7 +88,7 @@ impl Parser {
                     });
                 }
                 _ => {
-                    lox_error!("[line {}] Error: Invalid assignment target.", token.line())
+                    lox_error!("[line {}] Error: Invalid assignment target.", line)
                 }
             }
         }
@@ -301,10 +302,14 @@ impl Parser {
     }
 
     fn var_declaration(&mut self) -> Statement {
-        if let Some(token) = self.tokens.get(self.current).cloned() {
+        if let Some(token) = self.tokens.get(self.current) {
+            let line = token.line();
+
             match token {
-                Token::Keyword(ref k) => match &k.keyword {
+                Token::Keyword(k) => match &k.keyword {
                     Keyword::Identifier(name) => {
+                        let n = name.clone();
+
                         self.current += 1;
 
                         let initializer =
@@ -319,19 +324,16 @@ impl Parser {
                         consume!(self, Semicolon, "Error: Missing ';'.");
 
                         return Statement::Var(VarStatement {
-                            name: name.clone(),
+                            name: n,
                             initializer,
                         });
                     }
                     _ => lox_error!(
                         "[line {}] Error: The name of your variable cannot be a keyword.",
-                        token.line()
+                        line
                     ),
                 },
-                _ => lox_error!(
-                    "[line {}] Error: Provide a name for your variable.",
-                    token.line()
-                ),
+                _ => lox_error!("[line {}] Error: Provide a name for your variable.", line),
             }
         }
 

@@ -23,6 +23,7 @@ pub struct IfStatement {
 pub struct WhileStatement {
     pub condition: Expr,
     pub body: Box<Statement>,
+    pub in_for_loop: bool,
 }
 
 #[derive(Debug)]
@@ -115,7 +116,17 @@ impl Statement {
                     if let Err(ss) = res {
                         match ss {
                             StatementSignal::Break => break,
-                            StatementSignal::Continue => continue,
+                            StatementSignal::Continue => {
+                                if ws.in_for_loop {
+                                    let Statement::Block(ref loop_block) = *ws.body else {
+                                        continue;
+                                    };
+
+                                    let _ = loop_block.last().unwrap().eval();
+                                }
+
+                                continue;
+                            }
                         }
                     }
                 }

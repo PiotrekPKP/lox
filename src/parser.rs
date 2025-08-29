@@ -424,6 +424,7 @@ impl Parser {
                 value: LiteralExprType::Identifier(Keyword::True),
             })),
             body: Box::new(body),
+            in_for_loop: true,
         });
 
         if let Some(init) = initializer {
@@ -445,6 +446,7 @@ impl Parser {
         return Statement::While(WhileStatement {
             body: Box::new(body),
             condition,
+            in_for_loop: false,
         });
     }
 

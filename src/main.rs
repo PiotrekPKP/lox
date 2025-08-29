@@ -155,8 +155,6 @@ fn run(source: &String) -> Result<()> {
     let mut parser = Parser::new(tokens);
     let statements = parser.parse();
 
-    dbg!(&statements);
-
     let mut interpreter = Interpreter::new();
     interpreter.interpret(statements);
 

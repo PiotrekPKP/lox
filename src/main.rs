@@ -20,13 +20,6 @@ use crate::scanner::Scanner;
 use crate::token::Token;
 
 #[macro_export]
-macro_rules! token_n {
-    ($self:expr, $variant:ident) => {
-        Token::$variant($self.get_token_value())
-    };
-}
-
-#[macro_export]
 macro_rules! lox_error {
     ($fmt:expr $(, $($arg:tt)+ )? ) => {{
         eprintln!($fmt $(, $($arg)+ )?);

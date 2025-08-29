@@ -21,6 +21,40 @@ macro_rules! consume {
     };
 }
 
+macro_rules! match_token {
+    ($self:ident, $($token_type:ident)|+) => {{
+        if let Some(token) = $self.tokens.get($self.current) {
+            if matches!(token, $(Token::$token_type(_))|+) {
+                $self.current += 1;
+                Some(token)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }};
+
+    ($self:ident, $token_type:ident, $($inner_enum:ident)|+) => {{
+        if let Some(token) = $self.tokens.get($self.current) {
+            match token {
+                Token::$token_type(inner) => {
+                    let matched = matches!(inner.keyword, $(Keyword::$inner_enum)|+);
+                    if matched {
+                        $self.current += 1;
+                        Some(token)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }};
+}
+
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
@@ -42,26 +76,19 @@ impl Parser {
     fn assignment(&mut self) -> Expr {
         let expr = self.or();
 
-        if let Some(token) = self.tokens.get(self.current).cloned() {
-            match token {
-                Token::Equal(_) => {
-                    self.current += 1;
+        if let Some(token) = match_token!(self, Equal).cloned() {
+            let value = self.assignment();
 
-                    let value = self.assignment();
-
-                    match expr {
-                        Expr::Variable(v) => {
-                            return Expr::Assign(AssignExpr {
-                                name: v.name,
-                                value: Box::new(value),
-                            });
-                        }
-                        _ => {
-                            lox_error!("[line {}] Error: Invalid assignment target.", token.line())
-                        }
-                    }
+            match expr {
+                Expr::Variable(v) => {
+                    return Expr::Assign(AssignExpr {
+                        name: v.name,
+                        value: Box::new(value),
+                    });
                 }
-                _ => {}
+                _ => {
+                    lox_error!("[line {}] Error: Invalid assignment target.", token.line())
+                }
             }
         }
 
@@ -71,25 +98,15 @@ impl Parser {
     fn or(&mut self) -> Expr {
         let mut expr = self.and();
 
-        while let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Keyword(k) => match k.keyword {
-                    Keyword::Or => {
-                        self.current += 1;
+        while let Some(_) = match_token!(self, Keyword, Or) {
+            let operator = self.previous();
+            let right = self.and();
 
-                        let operator = self.previous();
-                        let right = self.and();
-
-                        expr = Expr::Logical(LogicalExpr {
-                            left: Box::new(expr),
-                            operator,
-                            right: Box::new(right),
-                        })
-                    }
-                    _ => break,
-                },
-                _ => break,
-            }
+            expr = Expr::Logical(LogicalExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            })
         }
 
         return expr;
@@ -98,25 +115,15 @@ impl Parser {
     fn and(&mut self) -> Expr {
         let mut expr = self.ternary();
 
-        while let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Keyword(k) => match k.keyword {
-                    Keyword::And => {
-                        self.current += 1;
+        while let Some(_) = match_token!(self, Keyword, And) {
+            let operator = self.previous();
+            let right = self.ternary();
 
-                        let operator = self.previous();
-                        let right = self.ternary();
-
-                        expr = Expr::Logical(LogicalExpr {
-                            left: Box::new(expr),
-                            operator,
-                            right: Box::new(right),
-                        })
-                    }
-                    _ => break,
-                },
-                _ => break,
-            }
+            expr = Expr::Logical(LogicalExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            })
         }
 
         return expr;
@@ -125,28 +132,16 @@ impl Parser {
     fn ternary(&mut self) -> Expr {
         let mut expr = self.equality();
 
-        loop {
-            match self.tokens.get(self.current) {
-                Some(token) => match token {
-                    Token::QuestionMark(_) => {
-                        self.current += 1;
+        while let Some(_) = match_token!(self, QuestionMark) {
+            let trueish = self.ternary();
+            consume!(self, Colon, "Error: Missing ':' in ternary expression.");
+            let falseish = self.ternary();
 
-                        let trueish = self.ternary();
-
-                        consume!(self, Colon, "Error: Missing ':' in ternary expression.");
-
-                        let falseish = self.ternary();
-
-                        expr = Expr::Ternary(TernaryExpr {
-                            condition: Box::new(expr),
-                            trueish: Box::new(trueish),
-                            falseish: Box::new(falseish),
-                        })
-                    }
-                    _ => break,
-                },
-                None => break,
-            }
+            expr = Expr::Ternary(TernaryExpr {
+                condition: Box::new(expr),
+                trueish: Box::new(trueish),
+                falseish: Box::new(falseish),
+            })
         }
 
         return expr;
@@ -155,24 +150,15 @@ impl Parser {
     fn equality(&mut self) -> Expr {
         let mut expr = self.comparison();
 
-        loop {
-            match self.tokens.get(self.current) {
-                Some(token) => match token {
-                    Token::BangEqual(_) | Token::EqualEqual(_) => {
-                        self.current += 1;
+        while let Some(_) = match_token!(self, BangEqual | EqualEqual) {
+            let operator = self.previous();
+            let right = self.comparison();
 
-                        let operator = self.previous();
-                        let right = self.comparison();
-                        expr = Expr::Binary(BinaryExpr {
-                            left: Box::new(expr),
-                            operator,
-                            right: Box::new(right),
-                        })
-                    }
-                    _ => break,
-                },
-                None => break,
-            }
+            expr = Expr::Binary(BinaryExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            })
         }
 
         return expr;
@@ -181,27 +167,15 @@ impl Parser {
     fn comparison(&mut self) -> Expr {
         let mut expr = self.term();
 
-        loop {
-            match self.tokens.get(self.current) {
-                Some(token) => match token {
-                    Token::Greater(_)
-                    | Token::GreaterEqual(_)
-                    | Token::Less(_)
-                    | Token::LessEqual(_) => {
-                        self.current += 1;
+        while let Some(_) = match_token!(self, Greater | GreaterEqual | Less | LessEqual) {
+            let operator = self.previous();
+            let right = self.term();
 
-                        let operator = self.previous();
-                        let right = self.term();
-                        expr = Expr::Binary(BinaryExpr {
-                            left: Box::new(expr),
-                            operator,
-                            right: Box::new(right),
-                        })
-                    }
-                    _ => break,
-                },
-                None => break,
-            }
+            expr = Expr::Binary(BinaryExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            })
         }
 
         return expr;
@@ -210,24 +184,15 @@ impl Parser {
     fn term(&mut self) -> Expr {
         let mut expr = self.factor();
 
-        loop {
-            match self.tokens.get(self.current) {
-                Some(token) => match token {
-                    Token::Minus(_) | Token::Plus(_) => {
-                        self.current += 1;
+        while let Some(_) = match_token!(self, Minus | Plus) {
+            let operator = self.previous();
+            let right = self.factor();
 
-                        let operator = self.previous();
-                        let right = self.factor();
-                        expr = Expr::Binary(BinaryExpr {
-                            left: Box::new(expr),
-                            operator,
-                            right: Box::new(right),
-                        })
-                    }
-                    _ => break,
-                },
-                None => break,
-            }
+            expr = Expr::Binary(BinaryExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            })
         }
 
         return expr;
@@ -236,44 +201,29 @@ impl Parser {
     fn factor(&mut self) -> Expr {
         let mut expr = self.unary();
 
-        loop {
-            match self.tokens.get(self.current) {
-                Some(token) => match token {
-                    Token::Slash(_) | Token::Star(_) => {
-                        self.current += 1;
+        while let Some(_) = match_token!(self, Slash | Star) {
+            let operator = self.previous();
+            let right = self.unary();
 
-                        let operator = self.previous();
-                        let right = self.unary();
-                        expr = Expr::Binary(BinaryExpr {
-                            left: Box::new(expr),
-                            operator,
-                            right: Box::new(right),
-                        })
-                    }
-                    _ => break,
-                },
-                None => break,
-            }
+            expr = Expr::Binary(BinaryExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            })
         }
 
         return expr;
     }
 
     fn unary(&mut self) -> Expr {
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Bang(_) | Token::Minus(_) => {
-                    self.current += 1;
+        if let Some(_) = match_token!(self, Bang | Minus) {
+            let operator = self.previous();
+            let right = self.unary();
 
-                    let operator = self.previous();
-                    let right = self.unary();
-                    return Expr::Unary(UnaryExpr {
-                        operator,
-                        right: Box::new(right),
-                    });
-                }
-                _ => {}
-            }
+            return Expr::Unary(UnaryExpr {
+                operator,
+                right: Box::new(right),
+            });
         }
 
         return self.primary();
@@ -343,17 +293,8 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Statement {
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Keyword(id) => match id.keyword {
-                    Keyword::Var => {
-                        self.current += 1;
-                        return self.var_declaration();
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
+        if let Some(_) = match_token!(self, Keyword, Var) {
+            return self.var_declaration();
         }
 
         return self.statement();
@@ -362,7 +303,7 @@ impl Parser {
     fn var_declaration(&mut self) -> Statement {
         if let Some(token) = self.tokens.get(self.current).cloned() {
             match token {
-                Token::Keyword(ref id) => match &id.keyword {
+                Token::Keyword(ref k) => match &k.keyword {
                     Keyword::Identifier(name) => {
                         self.current += 1;
 
@@ -401,38 +342,27 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Statement {
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Keyword(id) => match id.keyword {
-                    Keyword::Print => {
-                        self.current += 1;
-                        return self.print_statement();
-                    }
-                    Keyword::While => {
-                        self.current += 1;
-                        return self.while_statement();
-                    }
-                    Keyword::If => {
-                        self.current += 1;
-                        return self.if_statement();
-                    }
-                    Keyword::Break => {
-                        self.current += 1;
-                        return self.break_statement();
-                    }
-                    Keyword::Continue => {
-                        self.current += 1;
-                        return self.continue_statement();
-                    }
-                    _ => {}
-                },
-                Token::LeftBrace(_) => {
-                    self.current += 1;
+        if let Some(_) = match_token!(self, Keyword, Print) {
+            return self.print_statement();
+        }
 
-                    return Statement::Block(self.block());
-                }
-                _ => {}
-            }
+        if let Some(_) = match_token!(self, Keyword, While) {
+            return self.while_statement();
+        }
+
+        if let Some(_) = match_token!(self, Keyword, If) {
+            return self.if_statement();
+        }
+
+        if let Some(_) = match_token!(self, Keyword, Break) {
+            return self.break_statement();
+        }
+
+        if let Some(_) = match_token!(self, Keyword, Continue) {
+            return self.continue_statement();
+        }
+        if let Some(_) = match_token!(self, LeftBrace) {
+            return Statement::Block(self.block());
         }
 
         return self.expression_statement();
@@ -477,20 +407,11 @@ impl Parser {
         consume!(self, RightParen, "Error: Expected ')' after if condition.");
 
         let then_branch = self.statement();
-        let mut else_branch = None;
-
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Keyword(k) => match k.keyword {
-                    Keyword::Else => {
-                        self.current += 1;
-                        else_branch = Some(self.statement());
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-        }
+        let else_branch = if let Some(_) = match_token!(self, Keyword, Else) {
+            Some(self.statement())
+        } else {
+            None
+        };
 
         return Statement::If(IfStatement {
             condition,

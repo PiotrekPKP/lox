@@ -7,8 +7,13 @@ use crate::{
         Keyword, Token, TokenValue, TokenValueEof, TokenValueKeyword, TokenValueNumber,
         TokenValueString,
     },
-    token_n,
 };
+
+macro_rules! token_n {
+    ($self:expr, $variant:ident) => {
+        Token::$variant($self.get_token_value())
+    };
+}
 
 #[derive(Debug)]
 pub struct Scanner<'a> {

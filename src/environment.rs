@@ -1,9 +1,14 @@
 use std::{
     collections::HashMap,
-    sync::{Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::{lox_error, lox_type::LoxType};
+use crate::{
+    lox_error,
+    lox_type::{LoxFunction, LoxNumber, LoxType},
+    statement::Statement,
+};
 
 #[derive(Debug, Clone)]
 pub struct Environment {
@@ -54,8 +59,26 @@ static GLOBAL_ENV: OnceLock<Mutex<Environment>> = OnceLock::new();
 
 pub fn global_env() -> &'static Mutex<Environment> {
     GLOBAL_ENV.get_or_init(|| {
+        let mut values = HashMap::new();
+
+        values.insert(
+            "clock".to_string(),
+            LoxType::Function(LoxFunction {
+                arity: 0,
+                body: Statement::NativeFn(Arc::new(|| {
+                    let now = SystemTime::now();
+
+                    let duration_since_epoch = now
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Time went backwards lol.");
+
+                    return LoxType::Number(duration_since_epoch.as_millis() as LoxNumber);
+                })),
+            }),
+        );
+
         Mutex::new(Environment {
-            values: HashMap::new(),
+            values,
             enclosing: None,
         })
     })

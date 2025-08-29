@@ -1,3 +1,6 @@
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
+
 mod environment;
 mod expression;
 mod interpreter;

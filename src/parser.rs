@@ -1,7 +1,7 @@
 use crate::{
     expression::{
-        AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, LiteralExprType, LogicalExpr,
-        TernaryExpr, UnaryExpr, VariableExpr,
+        AssignExpr, BinaryExpr, CallExpr, Expr, GroupingExpr, LiteralExpr, LiteralExprType,
+        LogicalExpr, TernaryExpr, UnaryExpr, VariableExpr,
     },
     lox_error,
     statement::{IfStatement, Statement, VarStatement, WhileStatement},
@@ -9,16 +9,19 @@ use crate::{
 };
 
 macro_rules! consume {
-    ($self:ident, $($token_type:ident)|+, $msg:expr) => {
+    ($self:ident, $($token_type:ident)|+, $msg:expr) => {{
         if let Some(token) = $self.tokens.get($self.current) {
             match token {
                 $(Token::$token_type(_))|+ => {
                     $self.current += 1;
+                    token
                 },
-                _ => lox_error!(concat!("[line {}] ", $msg), token.line()),
+                _ => lox_error!(concat!("[line {}] ", $msg), token.line() - 1),
             }
+        } else {
+            lox_error!(concat!("Internal error: ", $msg));
         }
-    };
+    }};
 }
 
 macro_rules! match_token {
@@ -223,7 +226,55 @@ impl Parser {
             });
         }
 
-        return self.primary();
+        return self.call();
+    }
+
+    fn call(&mut self) -> Expr {
+        let mut expr = self.primary();
+
+        loop {
+            if let Some(_) = match_token!(self, LeftParen) {
+                expr = self.finish_call(expr);
+            } else {
+                break;
+            }
+        }
+
+        return expr;
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Expr {
+        let mut args = vec![];
+
+        if let Some(token) = self.tokens.get(self.current) {
+            let line = token.line();
+
+            match token {
+                Token::RightParen(_) => {}
+                _ => loop {
+                    if args.len() >= 255 {
+                        lox_error!(
+                            "[line {}] Error: Cannot have more than 255 arguments.",
+                            line
+                        );
+                    }
+
+                    args.push(self.expression());
+
+                    if match_token!(self, Comma).is_none() {
+                        break;
+                    }
+                },
+            }
+        }
+
+        let paren = consume!(self, RightParen, "Error: Expect ')' after arguments.");
+
+        return Expr::Call(CallExpr {
+            arguments: args,
+            paren: paren.clone(),
+            callee: Box::new(callee),
+        });
     }
 
     fn primary(&mut self) -> Expr {

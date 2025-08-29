@@ -146,7 +146,7 @@ impl Token {
             | Token::LessEqual(t) => t.line,
         };
 
-        return l - 1;
+        return l;
     }
 }
 

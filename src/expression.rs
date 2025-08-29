@@ -1,42 +1,42 @@
 use crate::{
     environment::global_env,
     lox_error,
-    lox_type::{LoxNumber, LoxString, LoxType},
+    lox_type::{LoxCallable, LoxNumber, LoxString, LoxType},
     token::{Keyword, Token},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssignExpr {
     pub name: String,
     pub value: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CallExpr {
     pub callee: Box<Expr>,
     pub paren: Token,
     pub arguments: Vec<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GetExpr {
     pub object: Box<Expr>,
     pub name: Token,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GroupingExpr {
     pub expression: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LiteralExprType {
     Identifier(Keyword),
     String(LoxString),
@@ -44,55 +44,55 @@ pub enum LiteralExprType {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LiteralExpr {
     pub value: LiteralExprType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LogicalExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SetExpr {
     pub object: Box<Expr>,
     pub name: Token,
     pub value: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SuperExpr {
     pub keyword: Token,
     pub method: Token,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TernaryExpr {
     pub condition: Box<Expr>,
     pub trueish: Box<Expr>,
     pub falseish: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ThisExpr {
     pub keyword: Token,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnaryExpr {
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VariableExpr {
     pub name: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Assign(AssignExpr),
     Binary(BinaryExpr),
@@ -193,7 +193,26 @@ impl Expr {
                     _ => unreachable!(),
                 }
             }
-            Expr::Call(call_expr) => LoxType::Unknown,
+            Expr::Call(call_expr) => {
+                let callee = call_expr.callee.eval();
+
+                let args = call_expr
+                    .arguments
+                    .iter()
+                    .map(|carg| carg.eval())
+                    .collect::<Vec<LoxType>>();
+
+                if args.len() != callee.arity() {
+                    lox_error!(
+                        "[line {}] Error: Expected {} arguments but got {}.",
+                        call_expr.paren.line(),
+                        callee.arity(),
+                        args.len()
+                    );
+                }
+
+                return callee.call((args, call_expr.paren.line()));
+            }
             Expr::Get(get_expr) => LoxType::Unknown,
             Expr::Grouping(grouping_expr) => grouping_expr.expression.eval(),
             Expr::Literal(literal_expr) => match &literal_expr.value {

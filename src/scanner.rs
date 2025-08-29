@@ -166,7 +166,9 @@ impl<'a> Iterator for Scanner<'a> {
 
         if self.is_at_end() {
             self.at_the_end = true;
-            return Some(Token::Eof(TokenValueEof { line: self.line }));
+            return Some(Token::Eof(TokenValueEof {
+                line: self.line + 1,
+            }));
         }
 
         let c = self.advance();

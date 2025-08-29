@@ -3,10 +3,23 @@ use crate::{
         AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, LiteralExprType, LogicalExpr,
         TernaryExpr, UnaryExpr, VariableExpr,
     },
-    parse_error,
+    lox_error,
     statement::{IfStatement, Statement, VarStatement, WhileStatement},
     token::{Keyword, Token},
 };
+
+macro_rules! consume {
+    ($self:ident, $($token_type:ident)|+, $msg:expr) => {
+        if let Some(token) = $self.tokens.get($self.current) {
+            match token {
+                $(Token::$token_type(_))|+ => {
+                    $self.current += 1;
+                },
+                _ => lox_error!(concat!("[line {}] ", $msg), token.line()),
+            }
+        }
+    };
+}
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -43,10 +56,9 @@ impl Parser {
                                 value: Box::new(value),
                             });
                         }
-                        _ => parse_error!(
-                            "[line {}] Error: Invalid assignment target.",
-                            token.line()
-                        ),
+                        _ => {
+                            lox_error!("[line {}] Error: Invalid assignment target.", token.line())
+                        }
                     }
                 }
                 _ => {}
@@ -121,17 +133,7 @@ impl Parser {
 
                         let trueish = self.ternary();
 
-                        if let Some(token_n) = self.tokens.get(self.current) {
-                            match token_n {
-                                Token::Colon(_) => {
-                                    self.current += 1;
-                                }
-                                _ => parse_error!(
-                                    "[line {}] Error: Missing ':' in ternary expression.",
-                                    token_n.line()
-                                ),
-                            }
-                        }
+                        consume!(self, Colon, "Error: Missing ':' in ternary expression.");
 
                         let falseish = self.ternary();
 
@@ -294,7 +296,7 @@ impl Parser {
                         return Expr::Variable(VariableExpr { name: name.clone() });
                     }
                     _ => {
-                        parse_error!(
+                        lox_error!(
                             "[line {}] Error: Unexpected identifier '{:?}' encountered.",
                             id.line,
                             id.keyword
@@ -320,14 +322,7 @@ impl Parser {
 
                     let expr = self.expression();
 
-                    if let Some(token_n) = self.tokens.get(self.current) {
-                        match token_n {
-                            Token::RightParen(_) => {
-                                self.current += 1;
-                            }
-                            _ => parse_error!("[line {}] Error: Missing ')'.", token_n.line()),
-                        }
-                    }
+                    consume!(self, RightParen, "Error: Missing ')'.");
 
                     return Expr::Grouping(GroupingExpr {
                         expression: Box::new(expr),
@@ -339,12 +334,12 @@ impl Parser {
                     });
                 }
                 _ => {
-                    parse_error!("Unexpected token {} encountered.", token);
+                    lox_error!("Unexpected token {} encountered.", token);
                 }
             }
         }
 
-        parse_error!("Empty file cannot be parsed.");
+        lox_error!("Empty file cannot be parsed.");
     }
 
     fn declaration(&mut self) -> Statement {
@@ -380,33 +375,26 @@ impl Parser {
                                 None
                             };
 
-                        if let Some(token_n) = self.tokens.get(self.current) {
-                            match token_n {
-                                Token::Semicolon(_) => {
-                                    self.current += 1;
-                                }
-                                _ => parse_error!("[line {}] Error: Missing ';'.", token_n.line()),
-                            }
-                        }
+                        consume!(self, Semicolon, "Error: Missing ';'.");
 
                         return Statement::Var(VarStatement {
                             name: name.clone(),
                             initializer,
                         });
                     }
-                    _ => parse_error!(
+                    _ => lox_error!(
                         "[line {}] Error: The name of your variable cannot be a keyword.",
                         token.line()
                     ),
                 },
-                _ => parse_error!(
+                _ => lox_error!(
                     "[line {}] Error: Provide a name for your variable.",
                     token.line()
                 ),
             }
         }
 
-        parse_error!(
+        lox_error!(
             "[line {}] Error: Provide a name for your variable.",
             self.tokens.last().unwrap().line()
         );
@@ -428,6 +416,14 @@ impl Parser {
                         self.current += 1;
                         return self.if_statement();
                     }
+                    Keyword::Break => {
+                        self.current += 1;
+                        return self.break_statement();
+                    }
+                    Keyword::Continue => {
+                        self.current += 1;
+                        return self.continue_statement();
+                    }
                     _ => {}
                 },
                 Token::LeftBrace(_) => {
@@ -446,48 +442,24 @@ impl Parser {
         let mut statements = vec![];
 
         while let Some(token) = self.tokens.get(self.current) {
-            if let Token::RightBrace(_) = token {
+            if let Token::RightBrace(_) | Token::Eof(_) = token {
                 break;
             }
 
             statements.push(self.declaration());
         }
 
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::RightBrace(_) => {
-                    self.current += 1;
-                }
-                _ => parse_error!("[line {}] Error: Missing '}}'.", token.line()),
-            }
-        }
+        consume!(self, RightBrace, "Error: Missing '}}'.");
 
         return statements;
     }
 
     fn while_statement(&mut self) -> Statement {
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::LeftParen(_) => {
-                    self.current += 1;
-                }
-                _ => parse_error!("[line {}] Error: Expected '(' after 'while'.", token.line()),
-            }
-        }
+        consume!(self, LeftParen, "Error: Expected '(' after 'while'.");
 
         let condition = self.expression();
 
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::RightParen(_) => {
-                    self.current += 1;
-                }
-                _ => parse_error!(
-                    "[line {}] Error: Expected ')' after condition.",
-                    token.line()
-                ),
-            }
-        }
+        consume!(self, RightParen, "Error: Expected ')' after condition.");
 
         let body = self.statement();
 
@@ -498,28 +470,11 @@ impl Parser {
     }
 
     fn if_statement(&mut self) -> Statement {
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::LeftParen(_) => {
-                    self.current += 1;
-                }
-                _ => parse_error!("[line {}] Error: Expected '(' after 'if'.", token.line()),
-            }
-        }
+        consume!(self, LeftParen, "Error: Expected '(' after 'if'.");
 
         let condition = self.expression();
 
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::RightParen(_) => {
-                    self.current += 1;
-                }
-                _ => parse_error!(
-                    "[line {}] Error: Expected ')' after if condition.",
-                    token.line()
-                ),
-            }
-        }
+        consume!(self, RightParen, "Error: Expected ')' after if condition.");
 
         let then_branch = self.statement();
         let mut else_branch = None;
@@ -547,32 +502,27 @@ impl Parser {
     fn print_statement(&mut self) -> Statement {
         let value = self.expression();
 
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Semicolon(_) => {
-                    self.current += 1;
-                }
-                _ => parse_error!("[line {}] Error: Missing ';'.", token.line()),
-            }
-        }
+        consume!(self, Semicolon, "Error: Missing ';'.");
 
         return Statement::Print(value);
+    }
+
+    fn break_statement(&mut self) -> Statement {
+        consume!(self, Semicolon, "Error: Missing ';'.");
+
+        return Statement::Break;
+    }
+
+    fn continue_statement(&mut self) -> Statement {
+        consume!(self, Semicolon, "Error: Missing ';'.");
+
+        return Statement::Continue;
     }
 
     fn expression_statement(&mut self) -> Statement {
         let expr = self.expression();
 
-        if let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Semicolon(_) => {
-                    self.current += 1;
-                }
-                Token::Eof(_) => {
-                    self.current += 1;
-                }
-                _ => parse_error!("[line {}] Error: Missing ';'.", token.line()),
-            }
-        }
+        consume!(self, Semicolon | Eof, "Error: Missing ';'.");
 
         return Statement::Expression(expr);
     }

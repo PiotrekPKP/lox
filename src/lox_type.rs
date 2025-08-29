@@ -1,3 +1,5 @@
+use std::fmt::write;
+
 pub type LoxString = String;
 pub type LoxNumber = f64;
 pub type LoxBoolean = bool;

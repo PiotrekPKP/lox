@@ -8,6 +8,8 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self, statements: Vec<Statement>) {
-        statements.iter().for_each(|s| s.eval());
+        statements.iter().for_each(|s| {
+            let _ = s.eval();
+        });
     }
 }

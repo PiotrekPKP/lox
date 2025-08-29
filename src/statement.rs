@@ -33,17 +33,29 @@ pub enum Statement {
     Block(Vec<Statement>),
     If(IfStatement),
     While(WhileStatement),
+    Break,
+    Continue,
+}
+
+#[derive(Debug)]
+pub enum StatementSignal {
+    Break,
+    Continue,
 }
 
 impl Statement {
-    pub fn eval(&self) {
-        match self {
+    pub fn eval(&self) -> Result<(), StatementSignal> {
+        return match self {
             Statement::Expression(expr) => {
                 let _value = expr.eval();
+
+                Ok(())
             }
             Statement::Print(expr) => {
                 let value = expr.eval();
                 println!("{}", value);
+
+                Ok(())
             }
             Statement::Var(vs) => {
                 let mut value = LoxType::Nil;
@@ -54,48 +66,64 @@ impl Statement {
 
                 let mut env = global_env().lock().unwrap();
                 env.define(vs.name.clone(), value);
+
+                Ok(())
             }
             Statement::Block(block) => {
-                {
-                    let mut guard = global_env().lock().unwrap();
+                let mut guard = global_env().lock().unwrap();
+                let prev = std::mem::replace(&mut *guard, Environment::new());
+                let new_env = Environment {
+                    values: HashMap::new(),
+                    enclosing: Some(Box::new(prev)),
+                };
+                *guard = new_env;
+                drop(guard);
 
-                    let prev = std::mem::replace(
-                        &mut *guard,
-                        Environment {
-                            enclosing: None,
-                            values: HashMap::new(),
-                        },
-                    );
+                for stmt in block {
+                    let res = stmt.eval();
 
-                    let new_env = Environment {
-                        values: HashMap::new(),
-                        enclosing: Some(Box::new(prev)),
-                    };
+                    if res.is_err() {
+                        let mut guard = global_env().lock().unwrap();
+                        if let Some(enclosing_box) = guard.enclosing.take() {
+                            *guard = *enclosing_box;
+                        }
 
-                    *guard = new_env;
-                }
-
-                block.iter().for_each(|s| s.eval());
-
-                {
-                    let mut guard = global_env().lock().unwrap();
-                    if let Some(enclosing_box) = guard.enclosing.take() {
-                        *guard = *enclosing_box;
+                        return res;
                     }
                 }
+
+                let mut guard = global_env().lock().unwrap();
+                if let Some(enclosing_box) = guard.enclosing.take() {
+                    *guard = *enclosing_box;
+                }
+
+                Ok(())
             }
             Statement::If(is) => {
                 if is.condition.eval().is_truthy() {
-                    let _value = is.then_branch.eval();
+                    is.then_branch.eval()?;
                 } else if let Some(else_branch) = &is.else_branch {
-                    let _value = else_branch.eval();
+                    else_branch.eval()?;
                 }
+
+                Ok(())
             }
             Statement::While(ws) => {
                 while ws.condition.eval().is_truthy() {
-                    let _value = ws.body.eval();
+                    let res = ws.body.eval();
+
+                    if let Err(ss) = res {
+                        match ss {
+                            StatementSignal::Break => break,
+                            StatementSignal::Continue => continue,
+                        }
+                    }
                 }
+
+                Ok(())
             }
-        }
+            Statement::Break => Err(StatementSignal::Break),
+            Statement::Continue => Err(StatementSignal::Continue),
+        };
     }
 }

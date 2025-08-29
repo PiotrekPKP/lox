@@ -35,6 +35,8 @@ pub struct TokenValueEof {
 #[derive(Debug, Clone)]
 pub enum Keyword {
     And,
+    Break,
+    Continue,
     Class,
     Else,
     False,
@@ -57,6 +59,8 @@ impl From<&str> for Keyword {
     fn from(s: &str) -> Self {
         match s {
             "and" => Keyword::And,
+            "break" => Keyword::Break,
+            "continue" => Keyword::Continue,
             "class" => Keyword::Class,
             "else" => Keyword::Else,
             "false" => Keyword::False,
@@ -114,7 +118,7 @@ pub enum Token {
 
 impl Token {
     pub fn line(&self) -> usize {
-        match self {
+        let l = match self {
             Token::Keyword(t) => t.line,
             Token::String(t) => t.line,
             Token::Number(t) => t.line,
@@ -140,7 +144,9 @@ impl Token {
             | Token::GreaterEqual(t)
             | Token::Less(t)
             | Token::LessEqual(t) => t.line,
-        }
+        };
+
+        return l - 1;
     }
 }
 

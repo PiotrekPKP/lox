@@ -27,7 +27,7 @@ macro_rules! token_n {
 }
 
 #[macro_export]
-macro_rules! parse_error {
+macro_rules! lox_error {
     ($fmt:expr $(, $($arg:tt)+ )? ) => {{
         eprintln!($fmt $(, $($arg)+ )?);
         std::process::exit(1);

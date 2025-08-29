@@ -3,7 +3,7 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
-use crate::{lox_type::LoxType, parse_error};
+use crate::{lox_error, lox_type::LoxType};
 
 #[derive(Debug, Clone)]
 pub struct Environment {
@@ -12,6 +12,13 @@ pub struct Environment {
 }
 
 impl Environment {
+    pub fn new() -> Self {
+        Self {
+            enclosing: None,
+            values: HashMap::new(),
+        }
+    }
+
     pub fn define(&mut self, name: String, value: LoxType) {
         self.values.insert(name, value);
     }
@@ -25,7 +32,7 @@ impl Environment {
             return enclosing.get(name);
         }
 
-        parse_error!("Undefined variable '{}'.", name);
+        lox_error!("Undefined variable '{}'.", name);
     }
 
     pub fn assign(&mut self, name: String, value: LoxType) {
@@ -39,7 +46,7 @@ impl Environment {
             return;
         }
 
-        parse_error!("Undefined variable '{}'", name);
+        lox_error!("Undefined variable '{}'", name);
     }
 }
 

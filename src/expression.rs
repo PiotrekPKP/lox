@@ -1,7 +1,7 @@
 use crate::{
     environment::global_env,
     lox_type::{LoxNumber, LoxString, LoxType},
-    parse_error,
+    lox_error,
     token::{Keyword, Token},
 };
 
@@ -127,28 +127,28 @@ impl Expr {
                 match &binary_expr.operator {
                     Token::Greater(_) => match (left, right) {
                         (LoxType::Number(ln), LoxType::Number(rn)) => LoxType::Boolean(ln > rn),
-                        _ => parse_error!(
+                        _ => lox_error!(
                             "[line {}] Error: Cannot compare NaNs",
                             binary_expr.operator.line()
                         ),
                     },
                     Token::GreaterEqual(_) => match (left, right) {
                         (LoxType::Number(ln), LoxType::Number(rn)) => LoxType::Boolean(ln >= rn),
-                        _ => parse_error!(
+                        _ => lox_error!(
                             "[line {}] Error: Cannot compare NaNs",
                             binary_expr.operator.line()
                         ),
                     },
                     Token::Less(_) => match (left, right) {
                         (LoxType::Number(ln), LoxType::Number(rn)) => LoxType::Boolean(ln < rn),
-                        _ => parse_error!(
+                        _ => lox_error!(
                             "[line {}] Error: Cannot compare NaNs",
                             binary_expr.operator.line()
                         ),
                     },
                     Token::LessEqual(_) => match (left, right) {
                         (LoxType::Number(ln), LoxType::Number(rn)) => LoxType::Boolean(ln <= rn),
-                        _ => parse_error!(
+                        _ => lox_error!(
                             "[line {}] Error: Cannot compare NaNs",
                             binary_expr.operator.line()
                         ),
@@ -157,7 +157,7 @@ impl Expr {
                     Token::EqualEqual(_) => LoxType::Boolean(left == right),
                     Token::Minus(_) => match (left, right) {
                         (LoxType::Number(ln), LoxType::Number(rn)) => LoxType::Number(ln - rn),
-                        _ => parse_error!(
+                        _ => lox_error!(
                             "[line {}] Error: Cannot subtract NaNs",
                             binary_expr.operator.line()
                         ),
@@ -171,21 +171,21 @@ impl Expr {
                         (LoxType::Number(ln), LoxType::String(rs)) => {
                             LoxType::String(ln.to_string() + &rs)
                         }
-                        _ => parse_error!(
+                        _ => lox_error!(
                             "[line {}] Error: Incompatible addition types",
                             binary_expr.operator.line()
                         ),
                     },
                     Token::Slash(_) => match (left, right) {
                         (LoxType::Number(ln), LoxType::Number(rn)) => LoxType::Number(ln / rn),
-                        _ => parse_error!(
+                        _ => lox_error!(
                             "[line {}] Error: Cannot divide NaNs",
                             binary_expr.operator.line()
                         ),
                     },
                     Token::Star(_) => match (left, right) {
                         (LoxType::Number(ln), LoxType::Number(rn)) => LoxType::Number(ln * rn),
-                        _ => parse_error!(
+                        _ => lox_error!(
                             "[line {}] Error: Cannot multiply NaNs",
                             binary_expr.operator.line()
                         ),
@@ -254,7 +254,7 @@ impl Expr {
                     Token::Minus(_) => match right {
                         LoxType::Number(n) => LoxType::Number(-n),
                         _ => {
-                            parse_error!("[line {}] Error: Cannot negate NaNs", unary_expr.operator)
+                            lox_error!("[line {}] Error: Cannot negate NaNs", unary_expr.operator)
                         }
                     },
                     _ => unreachable!(),

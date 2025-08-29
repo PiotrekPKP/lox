@@ -20,12 +20,19 @@ pub struct IfStatement {
 }
 
 #[derive(Debug)]
+pub struct WhileStatement {
+    pub condition: Expr,
+    pub body: Box<Statement>,
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Expression(Expr),
     Print(Expr),
     Var(VarStatement),
     Block(Vec<Statement>),
     If(IfStatement),
+    While(WhileStatement),
 }
 
 impl Statement {
@@ -49,25 +56,32 @@ impl Statement {
                 env.define(vs.name.clone(), value);
             }
             Statement::Block(block) => {
-                let enclosed = {
+                {
                     let mut guard = global_env().lock().unwrap();
-                    let mut enclosed = Environment {
-                        enclosing: Some(Box::new(guard.clone())),
+
+                    let prev = std::mem::replace(
+                        &mut *guard,
+                        Environment {
+                            enclosing: None,
+                            values: HashMap::new(),
+                        },
+                    );
+
+                    let new_env = Environment {
                         values: HashMap::new(),
+                        enclosing: Some(Box::new(prev)),
                     };
 
-                    std::mem::swap(&mut *guard, &mut enclosed);
-
-                    enclosed
-                };
+                    *guard = new_env;
+                }
 
                 block.iter().for_each(|s| s.eval());
 
                 {
                     let mut guard = global_env().lock().unwrap();
-                    let mut tmp = enclosed;
-
-                    std::mem::swap(&mut *guard, &mut tmp);
+                    if let Some(enclosing_box) = guard.enclosing.take() {
+                        *guard = *enclosing_box;
+                    }
                 }
             }
             Statement::If(is) => {
@@ -75,6 +89,11 @@ impl Statement {
                     let _value = is.then_branch.eval();
                 } else if let Some(else_branch) = &is.else_branch {
                     let _value = else_branch.eval();
+                }
+            }
+            Statement::While(ws) => {
+                while ws.condition.eval().is_truthy() {
+                    let _value = ws.body.eval();
                 }
             }
         }

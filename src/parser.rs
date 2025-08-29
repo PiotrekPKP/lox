@@ -4,7 +4,7 @@ use crate::{
         TernaryExpr, UnaryExpr, VariableExpr,
     },
     parse_error,
-    statement::{IfStatement, Statement, VarStatement},
+    statement::{IfStatement, Statement, VarStatement, WhileStatement},
     token::{Keyword, Token},
 };
 
@@ -420,6 +420,10 @@ impl Parser {
                         self.current += 1;
                         return self.print_statement();
                     }
+                    Keyword::While => {
+                        self.current += 1;
+                        return self.while_statement();
+                    }
                     Keyword::If => {
                         self.current += 1;
                         return self.if_statement();
@@ -459,6 +463,38 @@ impl Parser {
         }
 
         return statements;
+    }
+
+    fn while_statement(&mut self) -> Statement {
+        if let Some(token) = self.tokens.get(self.current) {
+            match token {
+                Token::LeftParen(_) => {
+                    self.current += 1;
+                }
+                _ => parse_error!("[line {}] Error: Expected '(' after 'while'.", token.line()),
+            }
+        }
+
+        let condition = self.expression();
+
+        if let Some(token) = self.tokens.get(self.current) {
+            match token {
+                Token::RightParen(_) => {
+                    self.current += 1;
+                }
+                _ => parse_error!(
+                    "[line {}] Error: Expected ')' after condition.",
+                    token.line()
+                ),
+            }
+        }
+
+        let body = self.statement();
+
+        return Statement::While(WhileStatement {
+            body: Box::new(body),
+            condition,
+        });
     }
 
     fn if_statement(&mut self) -> Statement {

@@ -1,6 +1,13 @@
 use std::collections::HashMap;
 
-use crate::{env, environment::Environment, expression::Expr, lox_type::LoxType};
+use crate::{env, environment::Environment, expression::Expr, lox_type::LoxType, token::Token};
+
+#[derive(Clone)]
+pub struct FunctionStatement {
+    pub name: String,
+    pub params: Vec<Token>,
+    pub body: Vec<Statement>,
+}
 
 #[derive(Clone)]
 pub struct VarStatement {
@@ -30,6 +37,7 @@ pub enum Statement {
     Block(Vec<Statement>),
     If(IfStatement),
     While(WhileStatement),
+    Function(FunctionStatement),
     Break,
     Continue,
 }
@@ -54,6 +62,7 @@ impl Statement {
 
                 Ok(())
             }
+            Statement::Function(_) => todo!(),
             Statement::Var(vs) => {
                 let mut value = LoxType::Nil;
 

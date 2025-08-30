@@ -1,5 +1,9 @@
 var start = clock();
 
+for (var j = 0; j < 10; j = j + 1) {
+  print j;
+}
+
 var i = 1;
 while(i < 10000) {
   i = i + 1;

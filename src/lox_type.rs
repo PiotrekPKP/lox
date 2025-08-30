@@ -76,7 +76,7 @@ pub trait LoxCallable: Send + Sync {
 }
 
 impl LoxCallable for LoxFunction {
-    fn call(&self, (_args, line): LoxCallableArgs) -> LoxType {
+    fn call(&self, (args, line): LoxCallableArgs) -> LoxType {
         let res = self.body.eval();
 
         if res.is_ok() {

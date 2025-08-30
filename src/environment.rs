@@ -23,7 +23,7 @@ macro_rules! lox_native_fn {
 #[macro_export]
 macro_rules! env {
     () => {
-        crate::environment::global_env().lock().unwrap()
+        crate::environment::shared_env().lock().unwrap()
     };
 }
 
@@ -72,10 +72,10 @@ impl Environment {
     }
 }
 
-static GLOBAL_ENV: OnceLock<Mutex<Environment>> = OnceLock::new();
+static SHARED_ENV: OnceLock<Mutex<Environment>> = OnceLock::new();
 
-pub fn global_env() -> &'static Mutex<Environment> {
-    GLOBAL_ENV.get_or_init(|| {
+pub fn shared_env() -> &'static Mutex<Environment> {
+    SHARED_ENV.get_or_init(|| {
         let mut values = HashMap::new();
 
         let clock_fn = |_| {
@@ -95,4 +95,18 @@ pub fn global_env() -> &'static Mutex<Environment> {
             enclosing: None,
         })
     })
+}
+
+pub fn with_env<R>(env: &mut Environment, f: impl FnOnce() -> R) -> R {
+    let prev = std::mem::replace(env, Environment::new());
+    let new_env = Environment {
+        values: HashMap::new(),
+        enclosing: Some(Box::new(prev)),
+    };
+    *env = new_env;
+    let result = f();
+    if let Some(enclosing_box) = env.enclosing.take() {
+        *env = *enclosing_box;
+    }
+    result
 }

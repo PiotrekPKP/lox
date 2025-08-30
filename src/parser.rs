@@ -4,7 +4,7 @@ use crate::{
         LogicalExpr, TernaryExpr, UnaryExpr, VariableExpr,
     },
     lox_error,
-    statement::{IfStatement, Statement, VarStatement, WhileStatement},
+    statement::{FunctionStatement, IfStatement, Statement, VarStatement, WhileStatement},
     token::{Keyword, Token},
 };
 
@@ -15,6 +15,40 @@ macro_rules! consume {
                 $(Token::$token_type(_))|+ => {
                     $self.current += 1;
                     token
+                },
+                _ => lox_error!(concat!("[line {}] ", $msg), token.line() - 1),
+            }
+        } else {
+            lox_error!(concat!("Internal error: ", $msg));
+        }
+    }};
+
+    ($self:ident, Keyword, Identifier, $msg:expr) => {{
+        if let Some(token) = $self.tokens.get($self.current) {
+            match token {
+                Token::Keyword(inner) => match &inner.keyword {
+                    Keyword::Identifier(_) => {
+                        $self.current += 1;
+                        token
+                    },
+                    _ => lox_error!(concat!("[line {}] ", $msg), token.line() - 1),
+                },
+                _ => lox_error!(concat!("[line {}] ", $msg), token.line() - 1),
+            }
+        } else {
+            lox_error!(concat!("Internal error: ", $msg));
+        }
+    }};
+
+    ($self:ident, Keyword, $inner:ident, $msg:expr) => {{
+        if let Some(token) = $self.tokens.get($self.current) {
+            match token {
+                Token::Keyword(inner) => match &inner.keyword {
+                    Keyword::$inner => {
+                        $self.current += 1;
+                        token
+                    },
+                    _ => lox_error!(concat!("[line {}] ", $msg), token.line() - 1),
                 },
                 _ => lox_error!(concat!("[line {}] ", $msg), token.line() - 1),
             }
@@ -341,11 +375,67 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Statement {
+        if let Some(_) = match_token!(self, Keyword, Fun) {
+            return self.function("function");
+        }
+
         if let Some(_) = match_token!(self, Keyword, Var) {
             return self.var_declaration();
         }
 
         return self.statement();
+    }
+
+    fn function(&mut self, _kind: &str) -> Statement {
+        let name = consume!(self, Keyword, Identifier, "Error: Expected function name.");
+        consume!(self, LeftParen, "Error: Expected '(' after function name.");
+
+        let mut parameters = vec![];
+        if let Some(token) = self.tokens.get(self.current) {
+            let line = token.line();
+
+            match token {
+                Token::RightParen(_) => {}
+                _ => loop {
+                    if parameters.len() > 255 {
+                        lox_error!(
+                            "[line {}] Error: Can't have more than 255 parameters.",
+                            line
+                        );
+                    }
+
+                    parameters.push(
+                        consume!(self, Keyword, Identifier, "Error: Expected parameter name.")
+                            .clone(),
+                    );
+
+                    if match_token!(self, Comma).is_none() {
+                        break;
+                    }
+                },
+            }
+        }
+
+        consume!(self, RightParen, "Error: Expected ')' after parameters.");
+        consume!(
+            self,
+            LeftBrace,
+            "Error: Expected '{{' before function body."
+        );
+
+        let name = match name {
+            Token::Keyword(k) => match &k.keyword {
+                Keyword::Identifier(n) => n,
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        };
+
+        return Statement::Function(FunctionStatement {
+            name: name.clone(),
+            params: parameters,
+            body: self.block(),
+        });
     }
 
     fn var_declaration(&mut self) -> Statement {
@@ -437,7 +527,7 @@ impl Parser {
     fn for_statement(&mut self) -> Statement {
         consume!(self, LeftParen, "Error: Expect '(' after 'for'.");
 
-        let mut initializer = None;
+        let initializer;
         if let Some(_) = match_token!(self, Semicolon) {
             initializer = None;
         } else if let Some(_) = match_token!(self, Keyword, Var) {

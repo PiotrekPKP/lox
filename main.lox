@@ -43,3 +43,14 @@ var a = "outer";
   var a = "inner";
   print a;
 }
+
+var a = "global";
+{
+  fun showA() {
+    print a;
+  }
+
+  showA();
+  var a = "block";
+  showA();
+}

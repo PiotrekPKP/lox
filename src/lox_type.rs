@@ -134,9 +134,3 @@ impl LoxCallable for LoxNativeFunction {
         return self.arity;
     }
 }
-
-impl dyn LoxCallable {
-    pub fn as_any(&self) -> &dyn Any {
-        self
-    }
-}

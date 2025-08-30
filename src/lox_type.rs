@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use crate::{
     environment::Environment,
@@ -31,6 +31,19 @@ pub enum LoxType {
     Nil,
     Unknown,
     Function(Arc<dyn LoxCallable>),
+}
+
+impl Debug for LoxType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
+            Self::Number(arg0) => f.debug_tuple("Number").field(arg0).finish(),
+            Self::Boolean(arg0) => f.debug_tuple("Boolean").field(arg0).finish(),
+            Self::Nil => write!(f, "Nil"),
+            Self::Unknown => write!(f, "Unknown"),
+            Self::Function(arg0) => f.debug_tuple("Function").finish(),
+        }
+    }
 }
 
 impl LoxType {
@@ -105,7 +118,7 @@ impl LoxCallable for LoxFunction {
         }
 
         match res.unwrap_err() {
-            StatementSignal::Return(rv) => rv,
+            StatementSignal::Return(rv) => rv.unwrap_or(LoxType::Nil),
             _ => lox_error!(
                 "[line {}] Error: Function terminated with an unexpected token.",
                 line

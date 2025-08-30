@@ -1,15 +1,8 @@
-use std::{
-    collections::HashMap,
-    sync::{Mutex, OnceLock},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::HashMap;
 
-use crate::{
-    lox_error,
-    lox_type::{LoxNativeFunction, LoxNumber, LoxType},
-};
+use crate::{lox_error, lox_type::LoxType};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Environment {
     pub enclosing: Option<Box<Environment>>,
     pub values: HashMap<String, LoxType>,
@@ -21,6 +14,11 @@ impl Environment {
             enclosing: enclosing.map(Box::new),
             values,
         }
+    }
+
+    pub fn reset(&mut self, with: &Environment) {
+        self.enclosing = with.enclosing.clone();
+        self.values = with.values.clone();
     }
 
     pub fn define(&mut self, name: String, value: LoxType) {

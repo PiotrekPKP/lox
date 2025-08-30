@@ -4,7 +4,9 @@ use crate::{
         LogicalExpr, TernaryExpr, UnaryExpr, VariableExpr,
     },
     lox_error,
-    statement::{FunctionStatement, IfStatement, Statement, VarStatement, WhileStatement},
+    statement::{
+        FunctionStatement, IfStatement, ReturnStatement, Statement, VarStatement, WhileStatement,
+    },
     token::{Keyword, Token},
 };
 
@@ -486,6 +488,10 @@ impl Parser {
             return self.print_statement();
         }
 
+        if let Some(token) = match_token!(self, Keyword, Return) {
+            return self.return_statement(token.clone());
+        }
+
         if let Some(_) = match_token!(self, Keyword, While) {
             return self.while_statement();
         }
@@ -589,6 +595,23 @@ impl Parser {
             condition,
             in_for_loop: false,
         });
+    }
+
+    fn return_statement(&mut self, keyword: Token) -> Statement {
+        let mut value = None;
+
+        if let Some(token) = self.tokens.get(self.current) {
+            match token {
+                Token::Semicolon(_) => {}
+                _ => {
+                    value = Some(self.expression());
+                }
+            }
+        }
+
+        consume!(self, Semicolon, "Error: Missing ';'.");
+
+        return Statement::Return(ReturnStatement { keyword, value });
     }
 
     fn if_statement(&mut self) -> Statement {

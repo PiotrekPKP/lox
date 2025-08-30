@@ -35,6 +35,12 @@ pub struct WhileStatement {
 }
 
 #[derive(Clone)]
+pub struct ReturnStatement {
+    pub keyword: Token,
+    pub value: Option<Expr>,
+}
+
+#[derive(Clone)]
 pub enum Statement {
     Expression(Expr),
     Print(Expr),
@@ -45,12 +51,13 @@ pub enum Statement {
     Function(FunctionStatement),
     Break,
     Continue,
+    Return(ReturnStatement),
 }
 
 pub enum StatementSignal {
     Break,
     Continue,
-    Return(LoxType),
+    Return(Option<LoxType>),
 }
 
 impl Statement {
@@ -95,10 +102,12 @@ impl Statement {
                     let res = stmt.eval(&mut block_env);
 
                     if res.is_err() {
+                        env.reset(&block_env.enclosing.unwrap());
                         return res;
                     }
                 }
 
+                env.reset(&block_env.enclosing.unwrap());
                 Ok(())
             }
             Statement::If(is) => {
@@ -137,6 +146,9 @@ impl Statement {
             }
             Statement::Break => Err(StatementSignal::Break),
             Statement::Continue => Err(StatementSignal::Continue),
+            Statement::Return(rs) => Err(StatementSignal::Return(
+                rs.value.as_ref().map(|r| r.eval(env)),
+            )),
         };
     }
 }

@@ -1,13 +1,11 @@
-var start = clock();
+fun count(n) {
+  print "called with n=" + n;
+  if (n > 1) {
+    count(n - 1);
+    print "returned with n=" + n;
+  }
 
-for (var j = 0; j < 10; j = j + 1) {
-  print j;
+  print n;
 }
 
-var i = 1;
-while(i < 10000) {
-  i = i + 1;
-}
-
-var end = clock();
-print "it took " + (end - start) + "ms";
+count(3);

@@ -434,7 +434,7 @@ impl Parser {
         return Statement::Function(FunctionStatement {
             name: name.clone(),
             params: parameters,
-            body: self.block(),
+            body: Box::new(Statement::Block(self.block())),
         });
     }
 

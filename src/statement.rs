@@ -1,12 +1,19 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::{env, environment::Environment, expression::Expr, lox_type::LoxType, token::Token};
+use crate::{
+    env,
+    environment::Environment,
+    expression::Expr,
+    lox_type::{LoxFunction, LoxType},
+    token::Token,
+    with_env,
+};
 
 #[derive(Clone)]
 pub struct FunctionStatement {
     pub name: String,
     pub params: Vec<Token>,
-    pub body: Vec<Statement>,
+    pub body: Box<Statement>,
 }
 
 #[derive(Clone)]
@@ -62,7 +69,16 @@ impl Statement {
 
                 Ok(())
             }
-            Statement::Function(_) => todo!(),
+            Statement::Function(fs) => {
+                let lox_fn = LoxType::Function(Arc::new(LoxFunction {
+                    params: fs.params.clone(),
+                    body: *fs.body.clone(),
+                }));
+
+                env!().define(fs.name.clone(), lox_fn);
+
+                Ok(())
+            }
             Statement::Var(vs) => {
                 let mut value = LoxType::Nil;
 
@@ -74,16 +90,7 @@ impl Statement {
 
                 Ok(())
             }
-            Statement::Block(block) => {
-                let mut guard = env!();
-                let prev = std::mem::replace(&mut *guard, Environment::new());
-                let new_env = Environment {
-                    values: HashMap::new(),
-                    enclosing: Some(Box::new(prev)),
-                };
-                *guard = new_env;
-                drop(guard);
-
+            Statement::Block(block) => with_env!(env!(), {
                 for stmt in block {
                     let res = stmt.eval();
 
@@ -97,13 +104,8 @@ impl Statement {
                     }
                 }
 
-                let mut guard = env!();
-                if let Some(enclosing_box) = guard.enclosing.take() {
-                    *guard = *enclosing_box;
-                }
-
                 Ok(())
-            }
+            }),
             Statement::If(is) => {
                 if is.condition.eval().is_truthy() {
                     is.then_branch.eval()?;

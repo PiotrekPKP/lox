@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use crate::{
-    lox_error,
+    env, lox_error,
     statement::{Statement, StatementSignal},
+    token::{Keyword, Token},
+    with_env, with_outermost_env,
 };
 
 pub type LoxString = String;
@@ -11,7 +13,7 @@ pub type LoxBoolean = bool;
 
 #[derive(Clone)]
 pub struct LoxFunction {
-    pub arity: usize,
+    pub params: Vec<Token>,
     pub body: Statement,
 }
 
@@ -77,23 +79,38 @@ pub trait LoxCallable: Send + Sync {
 
 impl LoxCallable for LoxFunction {
     fn call(&self, (args, line): LoxCallableArgs) -> LoxType {
-        let res = self.body.eval();
+        return with_outermost_env!(env!(), {
+            self.params
+                .iter()
+                .enumerate()
+                .for_each(|(i, param)| match param {
+                    Token::Keyword(k) => match &k.keyword {
+                        Keyword::Identifier(param_name) => {
+                            env!().define(param_name.clone(), args[i].clone())
+                        }
+                        _ => unreachable!(),
+                    },
+                    _ => unreachable!(),
+                });
 
-        if res.is_ok() {
-            return LoxType::Nil;
-        }
+            let res = self.body.eval();
 
-        return match res.unwrap_err() {
-            StatementSignal::Return(rv) => rv,
-            _ => lox_error!(
-                "[line {}] Error: Function terminated with an unexpected token.",
-                line
-            ),
-        };
+            if res.is_ok() {
+                return LoxType::Nil;
+            }
+
+            match res.unwrap_err() {
+                StatementSignal::Return(rv) => rv,
+                _ => lox_error!(
+                    "[line {}] Error: Function terminated with an unexpected token.",
+                    line
+                ),
+            }
+        });
     }
 
     fn arity(&self) -> usize {
-        return self.arity;
+        return self.params.len();
     }
 }
 

@@ -97,16 +97,74 @@ pub fn shared_env() -> &'static Mutex<Environment> {
     })
 }
 
-pub fn with_env<R>(env: &mut Environment, f: impl FnOnce() -> R) -> R {
-    let prev = std::mem::replace(env, Environment::new());
-    let new_env = Environment {
-        values: HashMap::new(),
-        enclosing: Some(Box::new(prev)),
-    };
-    *env = new_env;
-    let result = f();
-    if let Some(enclosing_box) = env.enclosing.take() {
-        *env = *enclosing_box;
-    }
-    result
+#[macro_export]
+macro_rules! with_env {
+    ($env:expr, $code:block) => {{
+        use crate::environment::Environment;
+        use std::collections::HashMap;
+
+        let mut guard = $env;
+
+        let prev = std::mem::replace(&mut *guard, Environment::new());
+        let new_env = Environment {
+            values: HashMap::new(),
+            enclosing: Some(Box::new(prev)),
+        };
+        *guard = new_env;
+
+        drop(guard);
+
+        let result = { $code };
+
+        let mut guard = $env;
+        if let Some(enclosing_box) = guard.enclosing.take() {
+            *guard = *enclosing_box;
+        }
+
+        result
+    }};
+}
+
+#[macro_export]
+macro_rules! with_outermost_env {
+    ($env:expr, $code:block) => {{
+        use crate::environment::Environment;
+        use std::collections::HashMap;
+
+        // Lock the mutex once
+        let mut guard = $env;
+
+        // Crawl to the outermost environment safely
+        let mut outer: &mut Environment = &mut *guard;
+        while outer.enclosing.is_some() {
+            outer = outer.enclosing.as_mut().map(|b| &mut **b).unwrap();
+        }
+
+        // Swap in a new temporary environment
+        let prev = std::mem::replace(outer, Environment::new());
+        let new_env = Environment {
+            values: HashMap::new(),
+            enclosing: Some(Box::new(prev)),
+        };
+        *outer = new_env;
+
+        // Drop the guard before executing code to avoid deadlock
+        drop(guard);
+
+        // Execute the code block
+        let result = { $code };
+
+        // Re-acquire the lock and crawl to outermost again to restore
+        let mut guard = $env;
+        let mut outer: &mut Environment = &mut *guard;
+        while outer.enclosing.is_some() {
+            outer = outer.enclosing.as_mut().map(|b| &mut **b).unwrap();
+        }
+
+        if let Some(enclosing_box) = outer.enclosing.take() {
+            *outer = *enclosing_box;
+        }
+
+        result
+    }};
 }

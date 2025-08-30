@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{
-    environment::{Environment, global_env},
-    expression::Expr,
-    lox_type::{LoxCallable, LoxType},
-};
+use crate::{env, environment::Environment, expression::Expr, lox_type::LoxType};
 
 #[derive(Clone)]
 pub struct VarStatement {
@@ -65,13 +61,12 @@ impl Statement {
                     value = expr.eval();
                 }
 
-                let mut env = global_env().lock().unwrap();
-                env.define(vs.name.clone(), value);
+                env!().define(vs.name.clone(), value);
 
                 Ok(())
             }
             Statement::Block(block) => {
-                let mut guard = global_env().lock().unwrap();
+                let mut guard = env!();
                 let prev = std::mem::replace(&mut *guard, Environment::new());
                 let new_env = Environment {
                     values: HashMap::new(),
@@ -84,7 +79,7 @@ impl Statement {
                     let res = stmt.eval();
 
                     if res.is_err() {
-                        let mut guard = global_env().lock().unwrap();
+                        let mut guard = env!();
                         if let Some(enclosing_box) = guard.enclosing.take() {
                             *guard = *enclosing_box;
                         }
@@ -93,7 +88,7 @@ impl Statement {
                     }
                 }
 
-                let mut guard = global_env().lock().unwrap();
+                let mut guard = env!();
                 if let Some(enclosing_box) = guard.enclosing.take() {
                     *guard = *enclosing_box;
                 }

@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Mutex, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -18,6 +18,13 @@ macro_rules! lox_native_fn {
             body: Arc::new($func),
         }))
     }};
+}
+
+#[macro_export]
+macro_rules! env {
+    () => {
+        crate::environment::global_env().lock().unwrap()
+    };
 }
 
 #[derive(Clone)]

@@ -1,7 +1,6 @@
 use crate::{
-    environment::global_env,
-    lox_error,
-    lox_type::{LoxCallable, LoxNumber, LoxString, LoxType},
+    env, lox_error,
+    lox_type::{LoxNumber, LoxString, LoxType},
     token::{Keyword, Token},
 };
 
@@ -114,9 +113,8 @@ impl Expr {
         match self {
             Expr::Assign(assign_expr) => {
                 let value = assign_expr.value.eval();
-                let mut env = global_env().lock().unwrap();
 
-                env.assign(assign_expr.name.clone(), value.clone());
+                env!().assign(assign_expr.name.clone(), value.clone());
 
                 return value;
             }
@@ -288,8 +286,7 @@ impl Expr {
                 }
             }
             Expr::Variable(variable_expr) => {
-                let env = global_env().lock().unwrap();
-                return env.get(&variable_expr.name).clone();
+                return env!().get(&variable_expr.name).clone();
             }
         }
     }

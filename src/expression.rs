@@ -116,14 +116,13 @@ impl Expr {
                 let value = assign_expr.value.eval(env);
 
                 env.assign(assign_expr.name.clone(), value.clone());
-
                 return value;
             }
             Expr::Binary(binary_expr) => {
                 let left = binary_expr.left.eval(env);
                 let right = binary_expr.right.eval(env);
 
-                match &binary_expr.operator {
+                let result = match &binary_expr.operator {
                     Token::Greater(_) => match (left, right) {
                         (LoxType::Number(ln), LoxType::Number(rn)) => LoxType::Boolean(ln > rn),
                         _ => lox_error!(
@@ -190,7 +189,8 @@ impl Expr {
                         ),
                     },
                     _ => unreachable!(),
-                }
+                };
+                return result;
             }
             Expr::Call(call_expr) => {
                 let callee = call_expr.callee.eval(env);
@@ -203,16 +203,19 @@ impl Expr {
 
                 match callee {
                     LoxType::Function(fun) => {
-                        if args.len() != fun.arity() {
+                        if args.len() != fun.lock().unwrap().arity() {
                             lox_error!(
                                 "[line {}] Error: Expected {} arguments but got {}.",
                                 call_expr.paren.line(),
-                                fun.arity(),
+                                fun.lock().unwrap().arity(),
                                 args.len()
                             );
                         }
 
-                        return fun.call((args, env, call_expr.paren.line()));
+                        return fun
+                            .lock()
+                            .unwrap()
+                            .call((args, env, call_expr.paren.line()));
                     }
                     _ => lox_error!(
                         "[line {}] Error: Can only call functions and classes.",
@@ -221,18 +224,22 @@ impl Expr {
                 }
             }
             Expr::Get(get_expr) => LoxType::Unknown,
-            Expr::Grouping(grouping_expr) => grouping_expr.expression.eval(env),
-            Expr::Literal(literal_expr) => match &literal_expr.value {
-                LiteralExprType::Identifier(id) => match id {
-                    Keyword::True => LoxType::Boolean(true),
-                    Keyword::False => LoxType::Boolean(false),
-                    Keyword::Nil => LoxType::Nil,
-                    _ => LoxType::Unknown,
-                },
-                LiteralExprType::Number(num) => LoxType::Number(*num),
-                LiteralExprType::String(str) => LoxType::String(str.clone()),
-                LiteralExprType::EOF => LoxType::Unknown,
-            },
+            Expr::Grouping(grouping_expr) => {
+                return grouping_expr.expression.eval(env);
+            }
+            Expr::Literal(literal_expr) => {
+                return match &literal_expr.value {
+                    LiteralExprType::Identifier(id) => match id {
+                        Keyword::True => LoxType::Boolean(true),
+                        Keyword::False => LoxType::Boolean(false),
+                        Keyword::Nil => LoxType::Nil,
+                        _ => LoxType::Unknown,
+                    },
+                    LiteralExprType::Number(num) => LoxType::Number(*num),
+                    LiteralExprType::String(str) => LoxType::String(str.clone()),
+                    LiteralExprType::EOF => LoxType::Unknown,
+                };
+            }
             Expr::Logical(logical_expr) => {
                 let left = logical_expr.left.eval(env);
 
@@ -275,7 +282,7 @@ impl Expr {
             Expr::Unary(unary_expr) => {
                 let right = unary_expr.right.eval(env);
 
-                match &unary_expr.operator {
+                let result = match &unary_expr.operator {
                     Token::Bang(_) => LoxType::Boolean(!right.is_truthy()),
                     Token::Minus(_) => match right {
                         LoxType::Number(n) => LoxType::Number(-n),
@@ -284,7 +291,9 @@ impl Expr {
                         }
                     },
                     _ => unreachable!(),
-                }
+                };
+
+                return result;
             }
             Expr::Variable(variable_expr) => {
                 return env.get(&variable_expr.name).clone();

@@ -14,11 +14,12 @@ macro_rules! lox_native_fn {
         use crate::lox_type::LoxNativeFunction;
         use crate::lox_type::LoxType;
         use std::sync::Arc;
+        use std::sync::Mutex;
 
-        LoxType::Function(Arc::new(LoxNativeFunction {
+        LoxType::Function(Arc::new(Mutex::new(LoxNativeFunction {
             arity: $arity,
             body: Arc::new($func),
-        }))
+        })))
     }};
 }
 

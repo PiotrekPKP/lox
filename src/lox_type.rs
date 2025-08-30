@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{
+    any::Any,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     environment::Environment,
@@ -13,8 +16,10 @@ pub type LoxBoolean = bool;
 
 #[derive(Clone)]
 pub struct LoxFunction {
+    pub name: String,
     pub params: Vec<Token>,
     pub body: Statement,
+    pub closure: Environment,
 }
 
 #[derive(Clone)]
@@ -30,20 +35,7 @@ pub enum LoxType {
     Boolean(LoxBoolean),
     Nil,
     Unknown,
-    Function(Arc<dyn LoxCallable>),
-}
-
-impl Debug for LoxType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
-            Self::Number(arg0) => f.debug_tuple("Number").field(arg0).finish(),
-            Self::Boolean(arg0) => f.debug_tuple("Boolean").field(arg0).finish(),
-            Self::Nil => write!(f, "Nil"),
-            Self::Unknown => write!(f, "Unknown"),
-            Self::Function(arg0) => f.debug_tuple("Function").finish(),
-        }
-    }
+    Function(Arc<Mutex<dyn LoxCallable>>),
 }
 
 impl LoxType {
@@ -65,7 +57,7 @@ impl std::fmt::Display for LoxType {
             LoxType::Number(n) => write!(f, "{n}"),
             LoxType::String(s) => write!(f, "{s}"),
             LoxType::Unknown => write!(f, "\0"),
-            LoxType::Function(lf) => write!(f, "<lox fn>({})", lf.arity()),
+            LoxType::Function(lf) => write!(f, "<lox fn>({})", lf.lock().unwrap().arity()),
         }
     }
 }
@@ -84,19 +76,20 @@ impl PartialEq for LoxType {
 pub type LoxFunctionArgs = Vec<LoxType>;
 pub type LoxCallableArgs<'a> = (LoxFunctionArgs, &'a mut Environment, usize);
 
-pub trait LoxCallable: Send + Sync {
-    fn call(&self, args: LoxCallableArgs) -> LoxType;
+pub trait LoxCallable: Send + Sync + Any {
+    fn call(&mut self, args: LoxCallableArgs) -> LoxType;
 
     fn arity(&self) -> usize;
 }
 
 impl LoxCallable for LoxFunction {
-    fn call(&self, (args, env, line): LoxCallableArgs) -> LoxType {
-        let mut outer = env;
-        while outer.enclosing.is_some() {
-            outer = outer.enclosing.as_mut().unwrap();
-        }
-        let mut call_env = Environment::new(Some(outer.clone()), HashMap::new());
+    fn call(&mut self, (args, env, line): LoxCallableArgs) -> LoxType {
+        let mut closure = self.closure.clone();
+        closure.define(
+            self.name.clone(),
+            LoxType::Function(Arc::new(Mutex::new(self.clone()))),
+        );
+        let mut call_env = Environment::new(Some(closure), env.values.clone());
 
         self.params
             .iter()
@@ -112,6 +105,7 @@ impl LoxCallable for LoxFunction {
             });
 
         let res = self.body.eval(&mut call_env);
+        self.closure.reset(&call_env.enclosing.unwrap());
 
         if res.is_ok() {
             return LoxType::Nil;
@@ -132,11 +126,17 @@ impl LoxCallable for LoxFunction {
 }
 
 impl LoxCallable for LoxNativeFunction {
-    fn call(&self, (args, _env, _line): LoxCallableArgs) -> LoxType {
+    fn call(&mut self, (args, _env, _line): LoxCallableArgs) -> LoxType {
         (self.body)(args)
     }
 
     fn arity(&self) -> usize {
         return self.arity;
+    }
+}
+
+impl dyn LoxCallable {
+    pub fn as_any(&self) -> &dyn Any {
+        self
     }
 }

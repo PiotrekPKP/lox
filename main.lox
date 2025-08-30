@@ -1,15 +1,45 @@
-fun sayHi(first, last) {
-  var i = 0;
-  while(i < 10) {
-    print i;
-    i = i + 1;
+var start = clock();
 
-    if(i == 5) {
-      return "abc";
-    }
+fun makeCounter() {
+  var i = 0;
+  fun count() {
+    i = i + 1;
+    print i;
   }
-  print "Hi, " + first + " " + last + "!";
-  return 1;
+
+  return count;
 }
 
-print sayHi("Dear", "Reader");
+var counter = makeCounter();
+counter(); // "1".
+counter(); // "2".
+
+var end = clock();
+
+print "it took " + (end - start) + "ms";
+
+var a = "global a";
+var b = "global b";
+var c = "global c";
+{
+  var a = "outer a";
+  var b = "outer b";
+  {
+    var a = "inner a";
+    print a;
+    print b;
+    print c;
+  }
+  print a;
+  print b;
+  print c;
+}
+print a;
+print b;
+print c;
+
+var a = "outer";
+{
+  var a = "inner";
+  print a;
+}

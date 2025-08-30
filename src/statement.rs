@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     environment::Environment,
@@ -59,26 +62,25 @@ pub enum StatementSignal {
     Continue,
     Return(Option<LoxType>),
 }
-
-impl Statement {
-    pub fn eval(&self, env: &mut Environment) -> Result<(), StatementSignal> {
+impl<'a> Statement {
+    pub fn eval(&self, env: &'a mut Environment) -> Result<(), StatementSignal> {
         return match self {
             Statement::Expression(expr) => {
                 let _value = expr.eval(env);
-
                 Ok(())
             }
             Statement::Print(expr) => {
                 let value = expr.eval(env);
                 println!("{}", value);
-
                 Ok(())
             }
             Statement::Function(fs) => {
-                let lox_fn = LoxType::Function(Arc::new(LoxFunction {
+                let lox_fn = LoxType::Function(Arc::new(Mutex::new(LoxFunction {
+                    name: fs.name.clone(),
                     params: fs.params.clone(),
                     body: *fs.body.clone(),
-                }));
+                    closure: env.clone(),
+                })));
 
                 env.define(fs.name.clone(), lox_fn);
 
@@ -103,11 +105,13 @@ impl Statement {
 
                     if res.is_err() {
                         env.reset(&block_env.enclosing.unwrap());
+
                         return res;
                     }
                 }
 
                 env.reset(&block_env.enclosing.unwrap());
+
                 Ok(())
             }
             Statement::If(is) => {
@@ -137,18 +141,26 @@ impl Statement {
 
                                 continue;
                             }
-                            StatementSignal::Return(_) => return Err(ss),
+                            StatementSignal::Return(_) => {
+                                return Err(ss);
+                            }
                         }
                     }
                 }
 
                 Ok(())
             }
-            Statement::Break => Err(StatementSignal::Break),
-            Statement::Continue => Err(StatementSignal::Continue),
-            Statement::Return(rs) => Err(StatementSignal::Return(
-                rs.value.as_ref().map(|r| r.eval(env)),
-            )),
+            Statement::Break => {
+                return Err(StatementSignal::Break);
+            }
+            Statement::Continue => {
+                return Err(StatementSignal::Continue);
+            }
+            Statement::Return(rs) => {
+                return Err(StatementSignal::Return(
+                    rs.value.as_ref().map(|r| r.eval(env)),
+                ));
+            }
         };
     }
 }

@@ -6,9 +6,19 @@ use std::{
 
 use crate::{
     lox_error,
-    lox_type::{LoxFunction, LoxNumber, LoxType},
-    statement::Statement,
+    lox_type::{LoxNativeFunction, LoxNumber, LoxType},
 };
+
+macro_rules! lox_native_fn {
+    ($arity:expr, $func:expr) => {{
+        use std::sync::Arc;
+
+        LoxType::Function(Arc::new(LoxNativeFunction {
+            arity: $arity,
+            body: Arc::new($func),
+        }))
+    }};
+}
 
 #[derive(Debug, Clone)]
 pub struct Environment {
@@ -61,21 +71,17 @@ pub fn global_env() -> &'static Mutex<Environment> {
     GLOBAL_ENV.get_or_init(|| {
         let mut values = HashMap::new();
 
-        values.insert(
-            "clock".to_string(),
-            LoxType::Function(LoxFunction {
-                arity: 0,
-                body: Statement::NativeFn(Arc::new(|| {
-                    let now = SystemTime::now();
+        let clock_fn = |_| {
+            let now = SystemTime::now();
 
-                    let duration_since_epoch = now
-                        .duration_since(UNIX_EPOCH)
-                        .expect("Time went backwards lol.");
+            let duration_since_epoch = now
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards lol.");
 
-                    return LoxType::Number(duration_since_epoch.as_millis() as LoxNumber);
-                })),
-            }),
-        );
+            return LoxType::Number(duration_since_epoch.as_millis() as LoxNumber);
+        };
+
+        values.insert("clock".to_string(), lox_native_fn!(0, clock_fn));
 
         Mutex::new(Environment {
             values,

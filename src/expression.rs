@@ -202,16 +202,24 @@ impl Expr {
                     .map(|carg| carg.eval())
                     .collect::<Vec<LoxType>>();
 
-                if args.len() != callee.arity() {
-                    lox_error!(
-                        "[line {}] Error: Expected {} arguments but got {}.",
-                        call_expr.paren.line(),
-                        callee.arity(),
-                        args.len()
-                    );
-                }
+                match callee {
+                    LoxType::Function(fun) => {
+                        if args.len() != fun.arity() {
+                            lox_error!(
+                                "[line {}] Error: Expected {} arguments but got {}.",
+                                call_expr.paren.line(),
+                                fun.arity(),
+                                args.len()
+                            );
+                        }
 
-                return callee.call((args, call_expr.paren.line()));
+                        return fun.call((args, call_expr.paren.line()));
+                    }
+                    _ => lox_error!(
+                        "[line {}] Error: Can only call functions and classes.",
+                        call_expr.paren.line()
+                    ),
+                }
             }
             Expr::Get(get_expr) => LoxType::Unknown,
             Expr::Grouping(grouping_expr) => grouping_expr.expression.eval(),

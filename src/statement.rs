@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use crate::{
     environment::{Environment, global_env},
     expression::Expr,
-    lox_type::LoxType,
+    lox_type::{LoxCallable, LoxType},
 };
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ pub struct WhileStatement {
     pub in_for_loop: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Statement {
     Expression(Expr),
     Print(Expr),
@@ -36,23 +36,6 @@ pub enum Statement {
     While(WhileStatement),
     Break,
     Continue,
-    NativeFn(Arc<dyn Fn() -> LoxType + Send + Sync>),
-}
-
-impl Debug for Statement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Expression(arg0) => f.debug_tuple("Expression").field(arg0).finish(),
-            Self::Print(arg0) => f.debug_tuple("Print").field(arg0).finish(),
-            Self::Var(arg0) => f.debug_tuple("Var").field(arg0).finish(),
-            Self::Block(arg0) => f.debug_tuple("Block").field(arg0).finish(),
-            Self::If(arg0) => f.debug_tuple("If").field(arg0).finish(),
-            Self::While(arg0) => f.debug_tuple("While").field(arg0).finish(),
-            Self::Break => write!(f, "Break"),
-            Self::Continue => write!(f, "Continue"),
-            Self::NativeFn(_) => f.debug_tuple("NativeFn").finish(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -154,10 +137,6 @@ impl Statement {
             }
             Statement::Break => Err(StatementSignal::Break),
             Statement::Continue => Err(StatementSignal::Continue),
-            Statement::NativeFn(closure) => {
-                let fn_res = closure.call(());
-                return Err(StatementSignal::Return(fn_res));
-            }
         };
     }
 }

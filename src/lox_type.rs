@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use crate::{
     lox_error,
@@ -9,19 +9,16 @@ pub type LoxString = String;
 pub type LoxNumber = f64;
 pub type LoxBoolean = bool;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LoxFunction {
     pub arity: usize,
     pub body: Statement,
 }
 
-impl Debug for LoxFunction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LoxFunction")
-            .field("arity", &self.arity)
-            .field("body", &self.body)
-            .finish()
-    }
+#[derive(Clone)]
+pub struct LoxNativeFunction {
+    pub arity: usize,
+    pub body: Arc<dyn Fn(LoxFunctionArgs) -> LoxType + Send + Sync>,
 }
 
 #[derive(Clone)]
@@ -31,7 +28,20 @@ pub enum LoxType {
     Boolean(LoxBoolean),
     Nil,
     Unknown,
-    Function(LoxFunction),
+    Function(Arc<dyn LoxCallable>),
+}
+
+impl Debug for LoxType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
+            Self::Number(arg0) => f.debug_tuple("Number").field(arg0).finish(),
+            Self::Boolean(arg0) => f.debug_tuple("Boolean").field(arg0).finish(),
+            Self::Nil => write!(f, "Nil"),
+            Self::Unknown => write!(f, "Unknown"),
+            Self::Function(arg0) => f.debug_tuple("Function").finish(),
+        }
+    }
 }
 
 impl LoxType {
@@ -41,13 +51,6 @@ impl LoxType {
             LoxType::Nil => false,
             LoxType::Number(n) => *n != 0.,
             _ => true,
-        }
-    }
-
-    pub fn arity(&self) -> usize {
-        match self {
-            LoxType::Function(lf) => lf.arity,
-            _ => 0,
         }
     }
 }
@@ -60,7 +63,7 @@ impl std::fmt::Display for LoxType {
             LoxType::Number(n) => write!(f, "{n}"),
             LoxType::String(s) => write!(f, "{s}"),
             LoxType::Unknown => write!(f, "\0"),
-            LoxType::Function(lf) => write!(f, "<lox fn>({})", lf.arity),
+            LoxType::Function(lf) => write!(f, "<lox fn>({})", lf.arity()),
         }
     }
 }
@@ -79,54 +82,40 @@ impl PartialEq for LoxType {
 pub type LoxFunctionArgs = Vec<LoxType>;
 pub type LoxCallableArgs = (LoxFunctionArgs, usize);
 
-pub trait LoxCallable: Debug + Clone {
+pub trait LoxCallable: Send + Sync {
     fn call(&self, args: LoxCallableArgs) -> LoxType;
+
+    fn arity(&self) -> usize;
 }
 
-impl LoxCallable for LoxType {
-    fn call(&self, (args, line): LoxCallableArgs) -> LoxType {
-        match self {
-            LoxType::Function(lf) => {
-                let res = lf.body.eval();
+impl LoxCallable for LoxFunction {
+    fn call(&self, (_args, line): LoxCallableArgs) -> LoxType {
+        let res = self.body.eval();
 
-                if res.is_ok() {
-                    return LoxType::Nil;
-                }
+        if res.is_ok() {
+            return LoxType::Nil;
+        }
 
-                return match res.unwrap_err() {
-                    StatementSignal::Return(rv) => rv,
-                    _ => lox_error!(
-                        "[line {}] Error: Function terminated with an unexpected token.",
-                        line
-                    ),
-                };
-            }
+        return match res.unwrap_err() {
+            StatementSignal::Return(rv) => rv,
             _ => lox_error!(
-                "[line {}] Error: Can only call functions and classes.",
+                "[line {}] Error: Function terminated with an unexpected token.",
                 line
             ),
-        }
+        };
+    }
+
+    fn arity(&self) -> usize {
+        return self.arity;
     }
 }
 
-impl<F: Debug + Clone> LoxCallable for F
-where
-    F: Fn(LoxFunctionArgs) -> LoxType,
-{
-    fn call(&self, (args, _): LoxCallableArgs) -> LoxType {
-        self(args)
+impl LoxCallable for LoxNativeFunction {
+    fn call(&self, (args, _line): LoxCallableArgs) -> LoxType {
+        (self.body)(args)
     }
-}
 
-impl Debug for LoxType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
-            Self::Number(arg0) => f.debug_tuple("Number").field(arg0).finish(),
-            Self::Boolean(arg0) => f.debug_tuple("Boolean").field(arg0).finish(),
-            Self::Nil => write!(f, "Nil"),
-            Self::Unknown => write!(f, "Unknown"),
-            Self::Function(arg0) => f.debug_tuple("Function").field(arg0).finish(),
-        }
+    fn arity(&self) -> usize {
+        return self.arity;
     }
 }

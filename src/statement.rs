@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::collections::HashMap;
 
 use crate::{
     environment::{Environment, global_env},
@@ -6,27 +6,27 @@ use crate::{
     lox_type::{LoxCallable, LoxType},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct VarStatement {
     pub name: String,
     pub initializer: Option<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IfStatement {
     pub condition: Expr,
     pub then_branch: Box<Statement>,
     pub else_branch: Option<Box<Statement>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct WhileStatement {
     pub condition: Expr,
     pub body: Box<Statement>,
     pub in_for_loop: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Statement {
     Expression(Expr),
     Print(Expr),
@@ -38,7 +38,6 @@ pub enum Statement {
     Continue,
 }
 
-#[derive(Debug)]
 pub enum StatementSignal {
     Break,
     Continue,

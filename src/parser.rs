@@ -295,7 +295,7 @@ impl Parser {
                     }
                     _ => {
                         lox_error!(
-                            "[line {}] Error: Unexpected identifier '{:?}' encountered.",
+                            "[line {}] Error: Unexpected identifier '{}' encountered.",
                             id.line,
                             id.keyword
                         );

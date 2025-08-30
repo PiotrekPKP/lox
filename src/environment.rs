@@ -20,7 +20,7 @@ macro_rules! lox_native_fn {
     }};
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Environment {
     pub enclosing: Option<Box<Environment>>,
     pub values: HashMap<String, LoxType>,

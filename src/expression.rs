@@ -5,38 +5,38 @@ use crate::{
     token::{Keyword, Token},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AssignExpr {
     pub name: String,
     pub value: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CallExpr {
     pub callee: Box<Expr>,
     pub paren: Token,
     pub arguments: Vec<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GetExpr {
     pub object: Box<Expr>,
     pub name: Token,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GroupingExpr {
     pub expression: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum LiteralExprType {
     Identifier(Keyword),
     String(LoxString),
@@ -44,55 +44,55 @@ pub enum LiteralExprType {
     EOF,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LiteralExpr {
     pub value: LiteralExprType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LogicalExpr {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SetExpr {
     pub object: Box<Expr>,
     pub name: Token,
     pub value: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SuperExpr {
     pub keyword: Token,
     pub method: Token,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TernaryExpr {
     pub condition: Box<Expr>,
     pub trueish: Box<Expr>,
     pub falseish: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ThisExpr {
     pub keyword: Token,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct UnaryExpr {
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct VariableExpr {
     pub name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Expr {
     Assign(AssignExpr),
     Binary(BinaryExpr),

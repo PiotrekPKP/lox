@@ -15,7 +15,6 @@ macro_rules! token_n {
     };
 }
 
-#[derive(Debug)]
 pub struct Scanner<'a> {
     source: &'a String,
     chars: Peekable<Chars<'a>>,

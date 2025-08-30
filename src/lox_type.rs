@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     lox_error,
@@ -9,7 +9,7 @@ pub type LoxString = String;
 pub type LoxNumber = f64;
 pub type LoxBoolean = bool;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct LoxFunction {
     pub arity: usize,
     pub body: Statement,
@@ -29,19 +29,6 @@ pub enum LoxType {
     Nil,
     Unknown,
     Function(Arc<dyn LoxCallable>),
-}
-
-impl Debug for LoxType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
-            Self::Number(arg0) => f.debug_tuple("Number").field(arg0).finish(),
-            Self::Boolean(arg0) => f.debug_tuple("Boolean").field(arg0).finish(),
-            Self::Nil => write!(f, "Nil"),
-            Self::Unknown => write!(f, "Unknown"),
-            Self::Function(arg0) => f.debug_tuple("Function").finish(),
-        }
-    }
 }
 
 impl LoxType {

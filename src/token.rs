@@ -1,38 +1,40 @@
+use std::fmt;
+
 use crate::lox_type::{LoxNumber, LoxString};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TokenValue {
     pub lexeme: String,
     pub line: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TokenValueString {
     pub lexeme: String,
     pub line: usize,
     pub value: LoxString,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TokenValueNumber {
     pub lexeme: String,
     pub line: usize,
     pub value: LoxNumber,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TokenValueKeyword {
     pub lexeme: String,
     pub line: usize,
     pub keyword: Keyword,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TokenValueEof {
     pub line: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Keyword {
     And,
     Break,
@@ -81,7 +83,33 @@ impl From<&str> for Keyword {
     }
 }
 
-#[derive(Debug, Clone)]
+impl fmt::Display for Keyword {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Keyword::And => write!(f, "and"),
+            Keyword::Break => write!(f, "break"),
+            Keyword::Continue => write!(f, "continue"),
+            Keyword::Class => write!(f, "class"),
+            Keyword::Else => write!(f, "else"),
+            Keyword::False => write!(f, "false"),
+            Keyword::Fun => write!(f, "fun"),
+            Keyword::For => write!(f, "for"),
+            Keyword::If => write!(f, "if"),
+            Keyword::Nil => write!(f, "nil"),
+            Keyword::Or => write!(f, "or"),
+            Keyword::Print => write!(f, "print"),
+            Keyword::Return => write!(f, "return"),
+            Keyword::Super => write!(f, "super"),
+            Keyword::This => write!(f, "this"),
+            Keyword::True => write!(f, "true"),
+            Keyword::Var => write!(f, "var"),
+            Keyword::While => write!(f, "while"),
+            Keyword::Identifier(s) => write!(f, "{s}"),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum Token {
     // Single character tokens.
     LeftParen(TokenValue),

@@ -1,12 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    env,
     environment::Environment,
     expression::Expr,
     lox_type::{LoxFunction, LoxType},
     token::Token,
-    with_env,
 };
 
 #[derive(Clone)]
@@ -56,15 +54,15 @@ pub enum StatementSignal {
 }
 
 impl Statement {
-    pub fn eval(&self) -> Result<(), StatementSignal> {
+    pub fn eval(&self, env: &mut Environment) -> Result<(), StatementSignal> {
         return match self {
             Statement::Expression(expr) => {
-                let _value = expr.eval();
+                let _value = expr.eval(env);
 
                 Ok(())
             }
             Statement::Print(expr) => {
-                let value = expr.eval();
+                let value = expr.eval(env);
                 println!("{}", value);
 
                 Ok(())
@@ -75,7 +73,7 @@ impl Statement {
                     body: *fs.body.clone(),
                 }));
 
-                env!().define(fs.name.clone(), lox_fn);
+                env.define(fs.name.clone(), lox_fn);
 
                 Ok(())
             }
@@ -83,41 +81,38 @@ impl Statement {
                 let mut value = LoxType::Nil;
 
                 if let Some(expr) = &vs.initializer {
-                    value = expr.eval();
+                    value = expr.eval(env);
                 }
 
-                env!().define(vs.name.clone(), value);
+                env.define(vs.name.clone(), value);
 
                 Ok(())
             }
-            Statement::Block(block) => with_env!(env!(), {
+            Statement::Block(block) => {
+                let mut block_env = Environment::new(Some(env.clone()), HashMap::new());
+
                 for stmt in block {
-                    let res = stmt.eval();
+                    let res = stmt.eval(&mut block_env);
 
                     if res.is_err() {
-                        let mut guard = env!();
-                        if let Some(enclosing_box) = guard.enclosing.take() {
-                            *guard = *enclosing_box;
-                        }
-
                         return res;
                     }
                 }
 
                 Ok(())
-            }),
+            }
             Statement::If(is) => {
-                if is.condition.eval().is_truthy() {
-                    is.then_branch.eval()?;
+                if is.condition.eval(env).is_truthy() {
+                    is.then_branch.eval(env)?;
                 } else if let Some(else_branch) = &is.else_branch {
-                    else_branch.eval()?;
+                    else_branch.eval(env)?;
                 }
 
                 Ok(())
             }
             Statement::While(ws) => {
-                while ws.condition.eval().is_truthy() {
-                    let res = ws.body.eval();
+                while ws.condition.eval(env).is_truthy() {
+                    let res = ws.body.eval(env);
 
                     if let Err(ss) = res {
                         match ss {
@@ -128,7 +123,7 @@ impl Statement {
                                         continue;
                                     };
 
-                                    let _ = loop_block.last().unwrap().eval();
+                                    let _ = loop_block.last().unwrap().eval(env);
                                 }
 
                                 continue;

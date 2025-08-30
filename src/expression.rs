@@ -1,5 +1,6 @@
 use crate::{
-    env, lox_error,
+    environment::Environment,
+    lox_error,
     lox_type::{LoxNumber, LoxString, LoxType},
     token::{Keyword, Token},
 };
@@ -109,18 +110,18 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn eval(&self) -> LoxType {
+    pub fn eval(&self, env: &mut Environment) -> LoxType {
         match self {
             Expr::Assign(assign_expr) => {
-                let value = assign_expr.value.eval();
+                let value = assign_expr.value.eval(env);
 
-                env!().assign(assign_expr.name.clone(), value.clone());
+                env.assign(assign_expr.name.clone(), value.clone());
 
                 return value;
             }
             Expr::Binary(binary_expr) => {
-                let left = binary_expr.left.eval();
-                let right = binary_expr.right.eval();
+                let left = binary_expr.left.eval(env);
+                let right = binary_expr.right.eval(env);
 
                 match &binary_expr.operator {
                     Token::Greater(_) => match (left, right) {
@@ -192,12 +193,12 @@ impl Expr {
                 }
             }
             Expr::Call(call_expr) => {
-                let callee = call_expr.callee.eval();
+                let callee = call_expr.callee.eval(env);
 
                 let args = call_expr
                     .arguments
                     .iter()
-                    .map(|carg| carg.eval())
+                    .map(|carg| carg.eval(env))
                     .collect::<Vec<LoxType>>();
 
                 match callee {
@@ -211,7 +212,7 @@ impl Expr {
                             );
                         }
 
-                        return fun.call((args, call_expr.paren.line()));
+                        return fun.call((args, env, call_expr.paren.line()));
                     }
                     _ => lox_error!(
                         "[line {}] Error: Can only call functions and classes.",
@@ -220,7 +221,7 @@ impl Expr {
                 }
             }
             Expr::Get(get_expr) => LoxType::Unknown,
-            Expr::Grouping(grouping_expr) => grouping_expr.expression.eval(),
+            Expr::Grouping(grouping_expr) => grouping_expr.expression.eval(env),
             Expr::Literal(literal_expr) => match &literal_expr.value {
                 LiteralExprType::Identifier(id) => match id {
                     Keyword::True => LoxType::Boolean(true),
@@ -233,7 +234,7 @@ impl Expr {
                 LiteralExprType::EOF => LoxType::Unknown,
             },
             Expr::Logical(logical_expr) => {
-                let left = logical_expr.left.eval();
+                let left = logical_expr.left.eval(env);
 
                 match &logical_expr.operator {
                     Token::Keyword(k) => match k.keyword {
@@ -255,14 +256,14 @@ impl Expr {
                     }
                 }
 
-                return logical_expr.right.eval();
+                return logical_expr.right.eval(env);
             }
             Expr::Set(set_expr) => LoxType::Unknown,
             Expr::Super(super_expr) => LoxType::Unknown,
             Expr::Ternary(ternary_expr) => {
-                let condition = ternary_expr.condition.eval();
-                let trueish = ternary_expr.trueish.eval();
-                let falseish = ternary_expr.falseish.eval();
+                let condition = ternary_expr.condition.eval(env);
+                let trueish = ternary_expr.trueish.eval(env);
+                let falseish = ternary_expr.falseish.eval(env);
 
                 if condition.is_truthy() {
                     return trueish;
@@ -272,7 +273,7 @@ impl Expr {
             }
             Expr::This(this_expr) => LoxType::Unknown,
             Expr::Unary(unary_expr) => {
-                let right = unary_expr.right.eval();
+                let right = unary_expr.right.eval(env);
 
                 match &unary_expr.operator {
                     Token::Bang(_) => LoxType::Boolean(!right.is_truthy()),
@@ -286,7 +287,7 @@ impl Expr {
                 }
             }
             Expr::Variable(variable_expr) => {
-                return env!().get(&variable_expr.name).clone();
+                return env.get(&variable_expr.name).clone();
             }
         }
     }

@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    env, lox_error,
+    environment::Environment,
+    lox_error,
     statement::{Statement, StatementSignal},
     token::{Keyword, Token},
-    with_env, with_outermost_env,
 };
 
 pub type LoxString = String;
@@ -69,7 +69,7 @@ impl PartialEq for LoxType {
 }
 
 pub type LoxFunctionArgs = Vec<LoxType>;
-pub type LoxCallableArgs = (LoxFunctionArgs, usize);
+pub type LoxCallableArgs<'a> = (LoxFunctionArgs, &'a mut Environment, usize);
 
 pub trait LoxCallable: Send + Sync {
     fn call(&self, args: LoxCallableArgs) -> LoxType;
@@ -78,35 +78,39 @@ pub trait LoxCallable: Send + Sync {
 }
 
 impl LoxCallable for LoxFunction {
-    fn call(&self, (args, line): LoxCallableArgs) -> LoxType {
-        return with_outermost_env!(env!(), {
-            self.params
-                .iter()
-                .enumerate()
-                .for_each(|(i, param)| match param {
-                    Token::Keyword(k) => match &k.keyword {
-                        Keyword::Identifier(param_name) => {
-                            env!().define(param_name.clone(), args[i].clone())
-                        }
-                        _ => unreachable!(),
-                    },
+    fn call(&self, (args, env, line): LoxCallableArgs) -> LoxType {
+        let mut outer = env;
+        while outer.enclosing.is_some() {
+            outer = outer.enclosing.as_mut().unwrap();
+        }
+        let mut call_env = Environment::new(Some(outer.clone()), HashMap::new());
+
+        self.params
+            .iter()
+            .enumerate()
+            .for_each(|(i, param)| match param {
+                Token::Keyword(k) => match &k.keyword {
+                    Keyword::Identifier(param_name) => {
+                        call_env.define(param_name.clone(), args[i].clone())
+                    }
                     _ => unreachable!(),
-                });
+                },
+                _ => unreachable!(),
+            });
 
-            let res = self.body.eval();
+        let res = self.body.eval(&mut call_env);
 
-            if res.is_ok() {
-                return LoxType::Nil;
-            }
+        if res.is_ok() {
+            return LoxType::Nil;
+        }
 
-            match res.unwrap_err() {
-                StatementSignal::Return(rv) => rv,
-                _ => lox_error!(
-                    "[line {}] Error: Function terminated with an unexpected token.",
-                    line
-                ),
-            }
-        });
+        match res.unwrap_err() {
+            StatementSignal::Return(rv) => rv,
+            _ => lox_error!(
+                "[line {}] Error: Function terminated with an unexpected token.",
+                line
+            ),
+        }
     }
 
     fn arity(&self) -> usize {
@@ -115,7 +119,7 @@ impl LoxCallable for LoxFunction {
 }
 
 impl LoxCallable for LoxNativeFunction {
-    fn call(&self, (args, _line): LoxCallableArgs) -> LoxType {
+    fn call(&self, (args, _env, _line): LoxCallableArgs) -> LoxType {
         (self.body)(args)
     }
 
